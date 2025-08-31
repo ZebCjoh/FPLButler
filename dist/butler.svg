@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 600">
+  <!-- Blue background -->
+  <rect width="400" height="600" fill="#5B82A3"/>
+  
+  <!-- Butler figure -->
+  <g transform="translate(200,300)">
+    <!-- Body -->
+    <ellipse cx="0" cy="100" rx="80" ry="120" fill="#2C1810" stroke="#1A0F08" stroke-width="3"/>
+    
+    <!-- White shirt front -->
+    <ellipse cx="0" cy="80" rx="50" ry="80" fill="#F5F5DC" stroke="#E0E0E0" stroke-width="2"/>
+    
+    <!-- Bow tie -->
+    <path d="M-15,-20 L-5,-15 L5,-15 L15,-20 L15,-10 L5,-5 L-5,-5 L-15,-10 Z" fill="#2C1810" stroke="#1A0F08" stroke-width="2"/>
+    <rect x="-8" y="-15" width="16" height="10" fill="#2C1810"/>
+    
+    <!-- Buttons -->
+    <circle cx="0" cy="20" r="3" fill="#333"/>
+    <circle cx="0" cy="40" r="3" fill="#333"/>
+    <circle cx="0" cy="60" r="3" fill="#333"/>
+    
+    <!-- Left arm holding tray -->
+    <ellipse cx="-60" cy="40" rx="20" ry="60" fill="#FDBCB4" stroke="#E09E8E" stroke-width="2" transform="rotate(-30)"/>
+    <ellipse cx="-80" cy="20" rx="25" ry="15" fill="#2C1810" stroke="#1A0F08" stroke-width="2"/>
+    
+    <!-- Tray -->
+    <ellipse cx="-90" cy="10" rx="35" ry="8" fill="#C0C0C0" stroke="#A0A0A0" stroke-width="2"/>
+    
+    <!-- Wine glass on tray -->
+    <path d="M-90,-5 L-85,-5 L-85,0 L-95,0 Z" fill="#8B0000"/>
+    <path d="M-90,0 L-88,5 L-92,5 Z" fill="#333"/>
+    <ellipse cx="-90" cy="-8" rx="8" ry="3" fill="#DC143C"/>
+    
+    <!-- Head -->
+    <circle cx="0" cy="-80" r="45" fill="#FDBCB4" stroke="#E09E8E" stroke-width="3"/>
+    
+    <!-- Hair -->
+    <path d="M-45,-80 Q-35,-120 0,-125 Q35,-120 45,-80 Q40,-100 20,-110 Q0,-115 -20,-110 Q-40,-100 -45,-80" fill="#2C1810" stroke="#1A0F08" stroke-width="2"/>
+    
+    <!-- Ear -->
+    <ellipse cx="35" cy="-80" rx="8" ry="12" fill="#FDBCB4" stroke="#E09E8E" stroke-width="2"/>
+    <ellipse cx="37" cy="-80" rx="4" ry="6" fill="#E09E8E"/>
+    
+    <!-- Eye -->
+    <ellipse cx="-8" cy="-85" rx="12" ry="8" fill="white"/>
+    <circle cx="-5" cy="-85" r="5" fill="#2C1810"/>
+    <circle cx="-3" cy="-87" r="2" fill="white"/>
+    
+    <!-- Eyebrow -->
+    <path d="M-20,-95 Q-10,-98 5,-95" stroke="#2C1810" stroke-width="3" fill="none"/>
+    
+    <!-- Nose -->
+    <path d="M0,-75 L5,-70 L0,-65 Q-3,-67 0,-75" fill="#E09E8E" stroke="#D08A7A" stroke-width="1"/>
+    
+    <!-- Mustache -->
+    <path d="M-15,-65 Q0,-60 15,-65 Q10,-58 0,-60 Q-10,-58 -15,-65" fill="#2C1810"/>
+    
+    <!-- Mouth -->
+    <path d="M-8,-55 Q0,-50 8,-55" stroke="#A0505A" stroke-width="2" fill="none"/>
+    
+    <!-- Right arm -->
+    <ellipse cx="60" cy="40" rx="20" ry="60" fill="#FDBCB4" stroke="#E09E8E" stroke-width="2" transform="rotate(30)"/>
+    <ellipse cx="80" cy="60" rx="15" ry="25" fill="#2C1810" stroke="#1A0F08" stroke-width="2"/>
+    
+    <!-- Collar -->
+    <path d="M-25,-25 L0,-15 L25,-25 L20,-35 L0,-30 L-20,-35 Z" fill="white" stroke="#E0E0E0" stroke-width="2"/>
+  </g>
+</svg>

@@ -1,10 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { getHighlights } from './logic/metrics';
 import { generateButlerAssessment } from './logic/butler';
 
 export const App = () => {
   const [standings, setStandings] = useState<any[]>([]);
-  const [gameweekData, setGameweekData] = useState<any>(null);
   const [currentGameweek, setCurrentGameweek] = useState<number>(1);
   const [weeklyStats, setWeeklyStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -224,6 +223,26 @@ export const App = () => {
         }
         console.debug('Highlights:', highlights);
 
+        let differential: {
+          player: string;
+          points: number;
+          ownership: number;
+          owners: string[];
+          managers: string[];
+        };
+        if (diffCandidate !== null) {
+          const dc = diffCandidate as { id: number; owners: number; points: number };
+          differential = {
+            player: elementIdToName[dc.id] || `#${dc.id}`,
+            points: dc.points,
+            ownership: diffOwners.length,
+            owners: diffOwners,
+            managers: diffManagers,
+          };
+        } else {
+          differential = { player: '-', points: 0, ownership: 0, owners: [], managers: [] };
+        }
+
         const weekly = {
           weekWinner,
           weekLoser,
@@ -255,18 +274,11 @@ export const App = () => {
             genius: roiRows[0],
             flop: roiRows[roiRows.length - 1],
           },
-          differential: diffCandidate ? {
-            player: elementIdToName[diffCandidate.id] || `#${diffCandidate.id}`,
-            points: diffCandidate.points,
-            ownership: diffOwners.length,
-            owners: diffOwners,
-            managers: diffManagers,
-          } : { player: '-', points: 0, ownership: 0, owners: [], managers: [] },
+          differential,
           highlights,
         };
 
         setWeeklyStats(weekly);
-        setGameweekData(bootstrapData);
         
         // Generate Butler's Assessment based on gameweek data
         const assessment = generateButlerAssessment({

@@ -1,12 +1,5 @@
 export type HighlightItem = { id: number; text: string };
 
-const chipLabel: Record<string, string> = {
-  triple_captain: 'Triple Captain',
-  wildcard: 'Wildcard',
-  freehit: 'Free Hit',
-  bench_boost: 'Bench Boost',
-};
-
 async function safeJson(url: string) {
   const res = await fetch(url);
   const ct = res.headers.get('content-type') || '';
