@@ -7,13 +7,43 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     console.log('[API] Fetching bootstrap-static...');
-    
-    const response = await fetch('https://fantasy.premierleague.com/api/bootstrap-static/', {
+
+    // Helper: retry with exponential backoff for transient blocks/errors
+    const fetchWithRetry = async (url: string, init: RequestInit, attempts: number = 4): Promise<Response> => {
+      let lastError: any;
+      for (let attempt = 1; attempt <= attempts; attempt++) {
+        try {
+          const resp = await fetch(url, init);
+          if (resp.ok) return resp;
+          // Retry on common transient statuses
+          if ([403, 429, 500, 502, 503, 504].includes(resp.status)) {
+            console.warn(`[API] bootstrap-static attempt ${attempt} failed with ${resp.status}. Retrying...`);
+          } else {
+            return resp;
+          }
+        } catch (err) {
+          lastError = err;
+          console.warn(`[API] bootstrap-static attempt ${attempt} threw error. Retrying...`, err);
+        }
+        // Backoff with jitter: 200ms, 600ms, 1200ms, 2400ms...
+        const base = 200 * Math.pow(2, attempt - 1);
+        const jitter = Math.floor(Math.random() * 100);
+        await new Promise((r) => setTimeout(r, base + jitter));
+      }
+      if (lastError) throw lastError;
+      // Final fallback fetch to return the last response (non-ok) if no error captured
+      return fetch(url, init);
+    };
+
+    const response = await fetchWithRetry('https://fantasy.premierleague.com/api/bootstrap-static/', {
       headers: {
         'User-Agent': 'Mozilla/5.0 (compatible; FPL-Butler/1.0)',
         'Accept': 'application/json, text/plain, */*',
         'Referer': 'https://fantasy.premierleague.com/',
         'Accept-Language': 'en-US,en;q=0.9',
+        // Extra hints to mimic browser more closely
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache'
       },
     });
 
