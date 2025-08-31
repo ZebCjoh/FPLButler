@@ -1,28 +1,35 @@
 export type HighlightItem = { id: number; text: string };
 
 async function safeJson(url: string) {
+  console.log(`[Metrics] Fetching: ${url}`);
   const res = await fetch(url);
   const ct = res.headers.get('content-type') || '';
-  if (!res.ok) throw new Error(`${url} -> HTTP ${res.status}`);
-  if (!ct.includes('application/json')) throw new Error(`${url} -> Non-JSON response`);
+  if (!res.ok) {
+    console.error(`[Metrics] Fetch failed: ${url} -> HTTP ${res.status}`);
+    throw new Error(`${url} -> HTTP ${res.status}`);
+  }
+  if (!ct.includes('application/json')) {
+    console.error(`[Metrics] Non-JSON response: ${url} -> ${ct}`);
+    throw new Error(`${url} -> Non-JSON response`);
+  }
   return res.json();
 }
 
 export async function getHighlights(gameweek: number, leagueId: number): Promise<HighlightItem[]> {
   try {
     // 1) Bootstrap for elements (player id -> name)
-    const bootstrap = await safeJson('/fpl/api/bootstrap-static/');
+    const bootstrap = await safeJson('/api/bootstrap-static');
     const elements = bootstrap.elements as any[];
     const elementIdToName: Record<number, string> = {};
     elements.forEach((el) => { elementIdToName[el.id] = el.web_name; });
 
     // 2) League entries
-    const standings = await safeJson(`/fpl/api/leagues-classic/${leagueId}/standings/`);
+    const standings = await safeJson(`/api/league/${leagueId}`);
     const entries = (standings?.standings?.results || []) as any[];
     const entryIds: number[] = entries.map((e) => e.entry);
 
     // 3) Live GW data for points/goals/assists
-    const live = await safeJson(`/fpl/api/event/${gameweek}/live/`);
+    const live = await safeJson(`/api/event/${gameweek}/live`);
     const pointsByEl: Record<number, number> = {};
     const goalsByEl: Record<number, number> = {};
     const assistsByEl: Record<number, number> = {};
@@ -41,7 +48,7 @@ export async function getHighlights(gameweek: number, leagueId: number): Promise
     for (const group of chunk(entryIds, 6)) {
       await Promise.all(group.map(async (entryId) => {
         try {
-          const picks = await safeJson(`/fpl/api/entry/${entryId}/event/${gameweek}/picks/`);
+          const picks = await safeJson(`/api/entry/${entryId}/event/${gameweek}/picks`);
           picksByEntry[entryId] = picks?.picks || [];
           chipByEntry[entryId] = picks?.active_chip || null;
           const cap = (picks?.picks || []).find((p: any) => p.is_captain);
@@ -78,7 +85,7 @@ export async function getHighlights(gameweek: number, leagueId: number): Promise
     // Fetch transfer data for all entries
     for (const entry of entries) {
       try {
-        const picks = await safeJson(`/fpl/api/entry/${entry.entry}/event/${gameweek}/picks/`);
+        const picks = await safeJson(`/api/entry/${entry.entry}/event/${gameweek}/picks`);
         const transfers = picks?.entry_history?.event_transfers || 0;
         const transfersCost = picks?.entry_history?.event_transfers_cost || 0;
         

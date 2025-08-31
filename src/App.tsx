@@ -18,7 +18,12 @@ export const App = () => {
         setLoading(true);
 
         // 1) Bootstrap for metadata (players, events, next deadline, current gw)
-        const bootstrapResponse = await fetch('/fpl/api/bootstrap-static/');
+        console.log('[App] Fetching bootstrap data...');
+        const bootstrapResponse = await fetch('/api/bootstrap-static');
+        if (!bootstrapResponse.ok) {
+          console.error('[App] Bootstrap fetch failed:', bootstrapResponse.status, bootstrapResponse.statusText);
+          throw new Error(`Bootstrap API failed: ${bootstrapResponse.status}`);
+        }
         const bootstrapData = await bootstrapResponse.json();
         const elements = bootstrapData.elements as any[]; // players
         const elementIdToName: Record<number, string> = {};
@@ -29,7 +34,12 @@ export const App = () => {
         setCurrentGameweek(currentGW);
 
         // 2) League standings
-        const standingsResponse = await fetch('/fpl/api/leagues-classic/155099/standings/');
+        console.log('[App] Fetching league standings...');
+        const standingsResponse = await fetch('/api/league/155099');
+        if (!standingsResponse.ok) {
+          console.error('[App] Standings fetch failed:', standingsResponse.status, standingsResponse.statusText);
+          throw new Error(`Standings API failed: ${standingsResponse.status}`);
+        }
         const standingsData = await standingsResponse.json();
         const leagueEntriesWithLeague = standingsData.standings.results as any[];
         // Add league name to each entry for easier access
@@ -40,7 +50,12 @@ export const App = () => {
         setStandings(leagueEntriesWithLeagueWithLeague);
 
         // 3) Live GW data for player points map
-        const liveResponse = await fetch(`/fpl/api/event/${currentGW}/live/`);
+        console.log('[App] Fetching live gameweek data...');
+        const liveResponse = await fetch(`/api/event/${currentGW}/live`);
+        if (!liveResponse.ok) {
+          console.error('[App] Live data fetch failed:', liveResponse.status, liveResponse.statusText);
+          throw new Error(`Live data API failed: ${liveResponse.status}`);
+        }
         const liveData = await liveResponse.json();
         const pointsByElement: Record<number, number> = {};
         (liveData.elements || []).forEach((e: any) => {
@@ -71,9 +86,9 @@ export const App = () => {
             group.map(async (entryId) => {
               try {
                 const [picks, history, transfers] = await Promise.all([
-                  safeJson(`/fpl/api/entry/${entryId}/event/${currentGW}/picks/`).catch(() => null),
-                  safeJson(`/fpl/api/entry/${entryId}/history/`).catch(() => null),
-                  safeJson(`/fpl/api/entry/${entryId}/transfers/`).catch(() => []),
+                  safeJson(`/api/entry/${entryId}/event/${currentGW}/picks`).catch(() => null),
+                  safeJson(`/api/entry/${entryId}/history`).catch(() => null),
+                  safeJson(`/api/entry/${entryId}/transfers`).catch(() => []),
                 ]);
                 if (picks) picksByEntry[entryId] = picks;
                 if (history) historyByEntry[entryId] = history;
