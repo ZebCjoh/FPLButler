@@ -117,30 +117,30 @@ export const App = () => {
           console.error('Failed to fetch form data:', error);
         }
 
-        // Fallback client-side computation when serverless endpoint is not available (e.g., local dev)
-        if ((!formData.hot || formData.hot.length === 0) && (!formData.cold || formData.cold.length === 0)) {
-          const fallbackWindow = Math.min(3, currentGW);
-          const gwSet = new Set<number>();
-          for (let i = 0; i < fallbackWindow; i++) {
-            const gw = currentGW - i;
-            if (gw >= 1) gwSet.add(gw);
-          }
+        // Client-side computation built from fetched history for robustness
+        const fallbackWindow = Math.min(3, currentGW);
+        const gwSet = new Set<number>();
+        for (let i = 0; i < fallbackWindow; i++) {
+          const gw = currentGW - i;
+          if (gw >= 1) gwSet.add(gw);
+        }
 
-          const computed = leagueEntriesWithLeague.map((row: any) => {
-            const entryId = row.entry;
-            const hist = historyByEntry[entryId]?.current || [];
-            const points = hist
-              .filter((h: any) => gwSet.has(h.event))
-              .reduce((sum: number, h: any) => sum + (h.points || 0), 0);
-            return {
-              entryId,
-              managerName: row.player_name,
-              teamName: row.entry_name,
-              points,
-            };
-          });
+        const computed = leagueEntriesWithLeague.map((row: any) => {
+          const entryId = row.entry;
+          const hist = historyByEntry[entryId]?.current || [];
+          const points = hist
+            .filter((h: any) => gwSet.has(h.event))
+            .reduce((sum: number, h: any) => sum + (h.points || 0), 0);
+          return {
+            entryId,
+            managerName: row.player_name,
+            teamName: row.entry_name,
+            points,
+          };
+        });
 
-          const sorted = [...computed].sort((a, b) => b.points - a.points);
+        const sorted = [...computed].sort((a, b) => b.points - a.points);
+        if (!formData.hot?.length || !formData.cold?.length) {
           formData = {
             window: fallbackWindow,
             currentGw: currentGW,
@@ -162,6 +162,8 @@ export const App = () => {
             formPoints: entry.points
           }))
         };
+
+        console.debug('[Form] window:', formData.window, 'hot:', formTable.hotStreak.length, 'cold:', formTable.coldStreak.length);
 
         // 4b) Bench points + chips used (from picks) + captain distribution
         const benchByEntry: Record<number, number> = {};
@@ -341,6 +343,7 @@ export const App = () => {
           highlights,
         };
 
+        console.debug('[Weekly] form counts -> hot:', weekly.formTable.hotStreak.length, 'cold:', weekly.formTable.coldStreak.length);
         setWeeklyStats(weekly);
         
         // Generate Butler's Assessment based on gameweek data
