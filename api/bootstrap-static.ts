@@ -6,7 +6,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    console.log('[API] Fetching bootstrap-static...');
+    console.log('[API] Fetching bootstrap-static v2...');
 
     // Helper: retry with exponential backoff for transient blocks/errors
     const fetchWithRetry = async (url: string, init: RequestInit, attempts: number = 4): Promise<Response> => {
@@ -65,7 +65,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     };
 
     if (!response.ok) {
-      console.warn('[API] Bootstrap primary failed:', response.status, response.statusText, '→ trying fallback');
+      console.warn('[API] [v2] Bootstrap primary failed:', response.status, response.statusText, '→ trying fallback');
       const fb = await fetchWithRetry(fallbackUrl, {
         headers: {
           'User-Agent': 'Mozilla/5.0 (compatible; FPL-Butler/1.0)',
@@ -73,7 +73,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       });
       if (!fb.ok) {
-        console.error('[API] Bootstrap fallback failed:', fb.status, fb.statusText);
+        console.error('[API] [v2] Bootstrap fallback failed:', fb.status, fb.statusText);
         return res.status(response.status).json({ 
           error: `FPL API returned ${response.status} and fallback ${fb.status}`,
           url: primaryUrl
@@ -82,7 +82,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const fbData = await parseJsonFlexible(fb);
       res.setHeader('Content-Type', 'application/json');
       res.setHeader('Cache-Control', 's-maxage=120, stale-while-revalidate=120');
-      console.log('[API] Bootstrap success via fallback');
+      console.log('[API] [v2] Bootstrap success via fallback');
       return res.status(200).json(fbData);
     }
 
@@ -91,7 +91,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     try {
       data = await parseJsonFlexible(response);
     } catch (e) {
-      console.warn('[API] Primary returned non-JSON, trying fallback parser via mirror...');
+      console.warn('[API] [v2] Primary returned non-JSON, trying fallback parser via mirror...');
       const fb = await fetchWithRetry(fallbackUrl, {
         headers: {
           'User-Agent': 'Mozilla/5.0 (compatible; FPL-Butler/1.0)',
@@ -99,7 +99,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       });
       if (!fb.ok) {
-        console.error('[API] Bootstrap fallback after parse failure failed:', fb.status, fb.statusText);
+        console.error('[API] [v2] Bootstrap fallback after parse failure failed:', fb.status, fb.statusText);
         return res.status(500).json({ 
           error: 'Expected JSON response from FPL API',
           contentType
@@ -107,14 +107,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
       data = await parseJsonFlexible(fb);
       res.setHeader('Cache-Control', 's-maxage=120, stale-while-revalidate=120');
-      console.log('[API] Bootstrap success via fallback after parse error');
+      console.log('[API] [v2] Bootstrap success via fallback after parse error');
     }
     
     // Set cache headers
     res.setHeader('Content-Type', 'application/json');
     res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=600');
     
-    console.log('[API] Bootstrap success');
+    console.log('[API] Bootstrap success v2');
     return res.status(200).json(data);
 
   } catch (error) {
