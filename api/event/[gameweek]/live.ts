@@ -17,7 +17,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const url = `https://fantasy.premierleague.com/api/event/${gameweek}/live/`;
     const response = await fetch(url, {
       headers: {
-        'User-Agent': 'FPLButler/1.0',
+        'User-Agent': 'Mozilla/5.0 (compatible; FPL-Butler/1.0)',
         'Accept': 'application/json, text/plain, */*',
         'Referer': 'https://fantasy.premierleague.com/',
         'Accept-Language': 'en-US,en;q=0.9',

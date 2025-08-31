@@ -2,7 +2,14 @@ export type HighlightItem = { id: number; text: string };
 
 async function safeJson(url: string) {
   console.log(`[Metrics] Fetching: ${url}`);
-  const res = await fetch(url);
+  const res = await fetch(url, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (compatible; FPL-Butler/1.0)',
+      'Accept': 'application/json, text/plain, */*',
+      'Referer': 'https://fantasy.premierleague.com/',
+      'Accept-Language': 'en-US,en;q=0.9',
+    },
+  });
   const ct = res.headers.get('content-type') || '';
   if (!res.ok) {
     console.error(`[Metrics] Fetch failed: ${url} -> HTTP ${res.status}`);

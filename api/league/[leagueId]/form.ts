@@ -63,7 +63,7 @@ async function processInBatches<T, R>(
 async function safeJson(url: string): Promise<any> {
   const response = await fetch(url, {
     headers: {
-      'User-Agent': 'FPLButler/1.0',
+      'User-Agent': 'Mozilla/5.0 (compatible; FPL-Butler/1.0)',
       'Accept': 'application/json, text/plain, */*',
       'Referer': 'https://fantasy.premierleague.com/',
       'Accept-Language': 'en-US,en;q=0.9',
