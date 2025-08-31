@@ -35,7 +35,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return fetch(url, init);
     };
 
-    const response = await fetchWithRetry('https://fantasy.premierleague.com/api/bootstrap-static/', {
+    const primaryUrl = 'https://fantasy.premierleague.com/api/bootstrap-static/';
+    const fallbackUrl = 'https://r.jina.ai/http://fantasy.premierleague.com/api/bootstrap-static/';
+
+    const response = await fetchWithRetry(primaryUrl, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (compatible; FPL-Butler/1.0)',
         'Accept': 'application/json, text/plain, */*',
@@ -47,24 +50,65 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       },
     });
 
+    // Helper to parse JSON even if content-type is text/plain
+    const parseJsonFlexible = async (resp: Response) => {
+      const contentType = resp.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        return resp.json();
+      }
+      const text = await resp.text();
+      try {
+        return JSON.parse(text);
+      } catch {
+        throw new Error(`Expected JSON, got content-type=${contentType}, length=${text.length}`);
+      }
+    };
+
     if (!response.ok) {
-      console.error('[API] Bootstrap failed:', response.status, response.statusText);
-      return res.status(response.status).json({ 
-        error: `FPL API returned ${response.status}`,
-        url: 'https://fantasy.premierleague.com/api/bootstrap-static/'
+      console.warn('[API] Bootstrap primary failed:', response.status, response.statusText, '→ trying fallback');
+      const fb = await fetchWithRetry(fallbackUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; FPL-Butler/1.0)',
+          'Accept': 'application/json, text/plain, */*'
+        }
       });
+      if (!fb.ok) {
+        console.error('[API] Bootstrap fallback failed:', fb.status, fb.statusText);
+        return res.status(response.status).json({ 
+          error: `FPL API returned ${response.status} and fallback ${fb.status}`,
+          url: primaryUrl
+        });
+      }
+      const fbData = await parseJsonFlexible(fb);
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Cache-Control', 's-maxage=120, stale-while-revalidate=120');
+      console.log('[API] Bootstrap success via fallback');
+      return res.status(200).json(fbData);
     }
 
     const contentType = response.headers.get('content-type') || '';
-    if (!contentType.includes('application/json')) {
-      console.error('[API] Non-JSON response:', contentType);
-      return res.status(500).json({ 
-        error: 'Expected JSON response from FPL API',
-        contentType 
+    let data: any;
+    try {
+      data = await parseJsonFlexible(response);
+    } catch (e) {
+      console.warn('[API] Primary returned non-JSON, trying fallback parser via mirror...');
+      const fb = await fetchWithRetry(fallbackUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; FPL-Butler/1.0)',
+          'Accept': 'application/json, text/plain, */*'
+        }
       });
+      if (!fb.ok) {
+        console.error('[API] Bootstrap fallback after parse failure failed:', fb.status, fb.statusText);
+        return res.status(500).json({ 
+          error: 'Expected JSON response from FPL API',
+          contentType
+        });
+      }
+      data = await parseJsonFlexible(fb);
+      res.setHeader('Cache-Control', 's-maxage=120, stale-while-revalidate=120');
+      console.log('[API] Bootstrap success via fallback after parse error');
     }
-
-    const data = await response.json();
     
     // Set cache headers
     res.setHeader('Content-Type', 'application/json');
