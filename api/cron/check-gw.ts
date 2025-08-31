@@ -46,7 +46,7 @@ export async function runCheck(): Promise<CheckResult> {
     console.log('[Cron] Fetching FPL bootstrap data...');
     const fplResponse = await fetch('https://fantasy.premierleague.com/api/bootstrap-static/', {
       headers: {
-        'User-Agent': 'FPLButler/1.0',
+        'User-Agent': 'Mozilla/5.0 (compatible; FPL-Butler/1.0)',
         'Accept': 'application/json',
         'Referer': 'https://fantasy.premierleague.com/',
       },
@@ -116,7 +116,10 @@ export async function runCheck(): Promise<CheckResult> {
           console.log('[Cron] Triggering deploy hook...');
           const hookResponse = await fetch(deployHookUrl, {
             method: 'POST',
-            timeout: 10000, // 10s timeout
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (compatible; FPL-Butler/1.0)',
+            },
+            // Note: timeout is not a standard fetch option, using signal instead would be better
           });
 
           if (hookResponse.ok) {
