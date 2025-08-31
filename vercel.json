@@ -1,4 +1,10 @@
 {
+  "crons": [
+    {
+      "path": "/api/cron/check-gw",
+      "schedule": "0 * * * *"
+    }
+  ],
   "functions": {
     "api/bootstrap-static.ts": {
       "memory": 1024,
@@ -23,6 +29,14 @@
     "api/entry/[entryId]/transfers.ts": {
       "memory": 1024,
       "maxDuration": 30
+    },
+    "api/cron/check-gw.ts": {
+      "memory": 512,
+      "maxDuration": 60
+    },
+    "api/cron/test.ts": {
+      "memory": 512,
+      "maxDuration": 60
     }
   },
   "rewrites": [
