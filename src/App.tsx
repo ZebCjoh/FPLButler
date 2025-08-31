@@ -117,6 +117,38 @@ export const App = () => {
           console.error('Failed to fetch form data:', error);
         }
 
+        // Fallback client-side computation when serverless endpoint is not available (e.g., local dev)
+        if ((!formData.hot || formData.hot.length === 0) && (!formData.cold || formData.cold.length === 0)) {
+          const fallbackWindow = Math.min(3, currentGW);
+          const gwSet = new Set<number>();
+          for (let i = 0; i < fallbackWindow; i++) {
+            const gw = currentGW - i;
+            if (gw >= 1) gwSet.add(gw);
+          }
+
+          const computed = leagueEntriesWithLeague.map((row: any) => {
+            const entryId = row.entry;
+            const hist = historyByEntry[entryId]?.current || [];
+            const points = hist
+              .filter((h: any) => gwSet.has(h.event))
+              .reduce((sum: number, h: any) => sum + (h.points || 0), 0);
+            return {
+              entryId,
+              managerName: row.player_name,
+              teamName: row.entry_name,
+              points,
+            };
+          });
+
+          const sorted = [...computed].sort((a, b) => b.points - a.points);
+          formData = {
+            window: fallbackWindow,
+            currentGw: currentGW,
+            hot: sorted.slice(0, 3),
+            cold: sorted.slice(-3).reverse(),
+          };
+        }
+
         // Legacy format for compatibility
         const formTable = {
           hotStreak: formData.hot.map(entry => ({
@@ -703,21 +735,29 @@ export const App = () => {
                       <div className="space-y-2">
                         <div className="bg-green-900/30 border border-green-600/50 rounded-lg p-2">
                           <p className="text-green-400 font-bold text-xs mb-1">🔥 Hot</p>
-                          {weeklyStats.formTable.hotStreak.slice(0, 2).map((team: any, index: number) => (
-                            <div key={index} className="flex justify-between items-center">
-                              <span className="text-white text-xs truncate">{team.manager}</span>
-                              <span className="text-green-300 font-bold text-xs">{team.formPoints}p</span>
-                            </div>
-                          ))}
+                          {weeklyStats.formTable.hotStreak.length === 0 ? (
+                            <p className="text-green-300/70 text-xs">Ingen data</p>
+                          ) : (
+                            weeklyStats.formTable.hotStreak.slice(0, 2).map((team: any, index: number) => (
+                              <div key={index} className="flex justify-between items-center">
+                                <span className="text-white text-xs truncate">{team.manager}</span>
+                                <span className="text-green-300 font-bold text-xs">{team.formPoints}p</span>
+                              </div>
+                            ))
+                          )}
                         </div>
                         <div className="bg-red-900/30 border border-red-600/50 rounded-lg p-2">
                           <p className="text-red-400 font-bold text-xs mb-1">🧊 Cold</p>
-                          {weeklyStats.formTable.coldStreak.slice(0, 2).map((team: any, index: number) => (
-                            <div key={index} className="flex justify-between items-center">
-                              <span className="text-white text-xs truncate">{team.manager}</span>
-                              <span className="text-red-300 font-bold text-xs">{team.formPoints}p</span>
-                            </div>
-                          ))}
+                          {weeklyStats.formTable.coldStreak.length === 0 ? (
+                            <p className="text-red-300/70 text-xs">Ingen data</p>
+                          ) : (
+                            weeklyStats.formTable.coldStreak.slice(0, 2).map((team: any, index: number) => (
+                              <div key={index} className="flex justify-between items-center">
+                                <span className="text-white text-xs truncate">{team.manager}</span>
+                                <span className="text-red-300 font-bold text-xs">{team.formPoints}p</span>
+                              </div>
+                            ))
+                          )}
                         </div>
                       </div>
                     </div>
