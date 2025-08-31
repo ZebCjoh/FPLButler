@@ -100,21 +100,36 @@ export const App = () => {
           );
         }
 
-        // 4a) Form last 3 gameweeks per entry
-        const formRows = leagueEntriesWithLeagueWithLeague.map((row: any) => {
-          const entryId = row.entry;
-          const hist = historyByEntry[entryId]?.current || [];
-          const lastThree = hist
-            .filter((h: any) => h.event <= currentGW && h.event >= currentGW - 2)
-            .sort((a: any, b: any) => a.event - b.event);
-          const formPoints = lastThree.reduce((sum: number, h: any) => sum + (h.points || 0), 0);
-          return {
-            teamName: row.entry_name,
-            manager: row.player_name,
-            formPoints,
-          };
-        });
-        const formTable = [...formRows].sort((a, b) => b.formPoints - a.formPoints);
+        // 4a) Form data - will be fetched separately from new API
+        let formData = {
+          window: 3,
+          currentGw: currentGW,
+          hot: [] as Array<{entryId: number; managerName: string; teamName: string; points: number}>,
+          cold: [] as Array<{entryId: number; managerName: string; teamName: string; points: number}>
+        };
+
+        try {
+          const formResponse = await fetch(`/api/league/155099/form?window=3`);
+          if (formResponse.ok) {
+            formData = await formResponse.json();
+          }
+        } catch (error) {
+          console.error('Failed to fetch form data:', error);
+        }
+
+        // Legacy format for compatibility
+        const formTable = {
+          hotStreak: formData.hot.map(entry => ({
+            teamName: entry.teamName,
+            manager: entry.managerName,
+            formPoints: entry.points
+          })),
+          coldStreak: formData.cold.map(entry => ({
+            teamName: entry.teamName,
+            manager: entry.managerName,
+            formPoints: entry.points
+          }))
+        };
 
         // 4b) Bench points + chips used (from picks) + captain distribution
         const benchByEntry: Record<number, number> = {};
@@ -282,9 +297,10 @@ export const App = () => {
             gameweek: nextEvent.id,
           } : { date: 'TBA', time: 'TBA', gameweek: currentGW + 1 },
           formTable: {
-            hotStreak: formTable.slice(0, 3),
-            coldStreak: formTable.slice(-3).reverse(),
+            hotStreak: formTable.hotStreak,
+            coldStreak: formTable.coldStreak,
           },
+          formData,
           transferROI: {
             genius: roiRows[0],
             flop: roiRows[roiRows.length - 1],
@@ -302,13 +318,13 @@ export const App = () => {
         
         setButlerAssessment(assessment);
         setError(null);
-      } catch (err) {
+    } catch (err) {
         console.error('Error fetching data:', err);
         setError('Kunne ikke hente ligadata. Prøv å refreshe siden.');
-      } finally {
-        setLoading(false);
-      }
-    };
+    } finally {
+      setLoading(false);
+    }
+  };
 
     fetchAllData();
   }, []);
@@ -516,8 +532,8 @@ export const App = () => {
                     ✨ Høydepunkter
                   </h2>
                   <p className="text-white/80 text-xs">Rundens mest interessante øyeblikk</p>
-                </div>
-                
+          </div>
+
                 <div className="grid grid-cols-1 gap-3">
                   {Array.isArray(weeklyStats?.highlights) && weeklyStats.highlights.length > 0 ? (
                     weeklyStats.highlights.map((h: { id: number; text: string }, index: number) => (
@@ -682,7 +698,7 @@ export const App = () => {
                         <div className="w-8 h-8 rounded-full bg-[#00E0D3]/60 flex items-center justify-center text-sm">
                           📈
                         </div>
-                        <h3 className="text-sm font-bold text-white">Form (3 GW)</h3>
+                        <h3 className="text-sm font-bold text-white">Form (GW {weeklyStats.formData?.window || 3})</h3>
                       </div>
                       <div className="space-y-2">
                         <div className="bg-green-900/30 border border-green-600/50 rounded-lg p-2">
@@ -785,7 +801,7 @@ export const App = () => {
                 </div>
               </section>
             </div>
-          </main>
+        </main>
         )}
       </div>
     </div>

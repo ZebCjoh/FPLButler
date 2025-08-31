@@ -15,7 +15,8 @@ const proxyConfig = {
       });
     },
   },
-  '/api/league': {
+  // Specific pattern for standings to avoid conflicts with form API
+  '^/api/league/[0-9]+$': {
     target: 'https://fantasy.premierleague.com/api',
     changeOrigin: true,
     rewrite: (path) => path.replace(/^\/api\/league\/(.+)/, '/leagues-classic/$1/standings/'),
