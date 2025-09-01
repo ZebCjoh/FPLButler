@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { getHighlights } from './logic/metrics';
-import { generateButlerAssessment } from './logic/butler';
 
 export const App = () => {
   const [standings, setStandings] = useState<any[]>([]);
@@ -346,53 +345,30 @@ export const App = () => {
         console.debug('[Weekly] form counts -> hot:', weekly.formTable.hotStreak.length, 'cold:', weekly.formTable.coldStreak.length);
         setWeeklyStats(weekly);
         
-        // Butler's Assessment: 100% consistent using single stable cache key
-        const aiCacheKey = 'ai-summary-current';
-        let finalAssessment: string | null = null;
-        
-        // 1) Try localStorage first
+        // Butler's Assessment: Always fetch from backend (Vercel Blob via cron system)
         try {
-          const cached = typeof window !== 'undefined' ? localStorage.getItem(aiCacheKey) : null;
-          if (cached) {
-            try {
-              const cachedObj = JSON.parse(cached);
-              if (cachedObj?.summary) {
-                finalAssessment = cachedObj.summary;
-                console.log('[App] Using cached AI summary');
-              }
-            } catch (parseError) {
-              console.warn('[App] Failed to parse cached AI summary, removing invalid cache');
-              if (typeof window !== 'undefined') {
-                localStorage.removeItem(aiCacheKey);
-              }
-            }
-          }
-        } catch (cacheError) {
-          console.warn('[App] localStorage not available');
-        }
-
-        // 2) Generate new summary only if no valid cache exists
-        if (!finalAssessment) {
-          console.log('[App] No cached summary found, generating new one...');
-          finalAssessment = generateButlerAssessment({ weeklyStats: weekly });
-          console.log('[App] Generated and cached new summary');
+          console.log('[App] Fetching AI summary from backend...');
           
-          // Store in cache immediately
-          try {
-            if (typeof window !== 'undefined') {
-              localStorage.setItem(aiCacheKey, JSON.stringify({ 
-                summary: finalAssessment,
-                generatedAt: new Date().toISOString(),
-                gameweek: currentGW
-              }));
-            }
-          } catch (cacheStoreError) {
-            console.warn('[App] Failed to store AI summary in localStorage:', cacheStoreError);
+          const aiResponse = await fetch('/api/ai-summary');
+          
+          if (aiResponse.ok) {
+            const aiData = await aiResponse.json();
+            const summaryText = aiData.summary || '';
+            console.log(`[App] Loaded AI summary for GW ${aiData.gameweek} from backend`);
+            setButlerAssessment(summaryText);
+          } else if (aiResponse.status === 404) {
+            // No cached summary available yet - use fallback
+            const fallbackData = await aiResponse.json();
+            const fallbackText = fallbackData.fallback || "Butleren forbereder en vurdering av ukens prestasjoner. Vennligst vent mens han observerer kompetansen.";
+            console.log('[App] No AI summary available in backend, using fallback');
+            setButlerAssessment(fallbackText);
+          } else {
+            throw new Error(`AI summary API failed: ${aiResponse.status}`);
           }
-        }
-        
-        if (finalAssessment) {
-          setButlerAssessment(finalAssessment);
+        } catch (aiError) {
+          console.warn('[App] Failed to fetch AI summary from backend:', aiError);
+          // Last resort: use static fallback message
+          setButlerAssessment("Butleren er for opptatt med å observere kompetente mennesker til å kommentere akkurat nå.");
         }
         setError(null);
     } catch (err) {
