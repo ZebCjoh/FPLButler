@@ -87,8 +87,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       generatedAt
     };
 
-    // Store AI summary in Blob
-    await put('fpl-butler/ai-summary.json', JSON.stringify(aiSummaryData, null, 2), {
+    // Store AI summary in Blob (uses fpl-butler-blob storage)
+    await put('ai-summary.json', JSON.stringify(aiSummaryData, null, 2), {
       contentType: 'application/json'
     });
 

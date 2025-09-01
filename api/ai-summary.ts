@@ -13,16 +13,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    console.log('[AI Summary API] Fetching cached AI summary...');
+    console.log('[AI Summary API] Fetching cached AI summary from fpl-butler-blob...');
     
     // Try to get the cached AI summary from Vercel Blob
-    const blob = await get('fpl-butler/ai-summary.json');
+    const blob = await get('ai-summary.json');
     
     if (!blob) {
       console.log('[AI Summary API] No cached summary found');
       return res.status(404).json({ 
-        error: 'No AI summary available',
-        fallback: "Butleren forbereder en vurdering av ukens prestasjoner. Vennligst vent mens han observerer kompetansen."
+        error: 'No summary yet'
       });
     }
 
@@ -40,8 +39,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   } catch (error) {
     console.error('[AI Summary API] Error fetching AI summary:', error);
     return res.status(500).json({
-      error: 'Failed to fetch AI summary',
-      fallback: "Butleren er for opptatt med å observere kompetente mennesker til å kommentere akkurat nå."
+      error: 'Failed to fetch AI summary'
     });
   }
 }

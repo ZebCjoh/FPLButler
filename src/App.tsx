@@ -357,11 +357,9 @@ export const App = () => {
             console.log(`[App] Loaded AI summary for GW ${aiData.gameweek} from backend`);
             setButlerAssessment(summaryText);
           } else if (aiResponse.status === 404) {
-            // No cached summary available yet - use fallback
-            const fallbackData = await aiResponse.json();
-            const fallbackText = fallbackData.fallback || "Butleren forbereder en vurdering av ukens prestasjoner. Vennligst vent mens han observerer kompetansen.";
-            console.log('[App] No AI summary available in backend, using fallback');
-            setButlerAssessment(fallbackText);
+            // No cached summary available yet
+            console.log('[App] No AI summary available in backend yet');
+            setButlerAssessment("Butleren forbereder en vurdering av ukens prestasjoner. Vennligst vent mens han observerer kompetansen.");
           } else {
             throw new Error(`AI summary API failed: ${aiResponse.status}`);
           }
