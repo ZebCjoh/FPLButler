@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { getHighlights } from './logic/metrics';
 import { generateButlerAssessment } from './logic/butler';
 
@@ -9,6 +9,14 @@ export const App = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [butlerAssessment, setButlerAssessment] = useState<string>('');
+  const butlerLockedRef = useRef<boolean>(false);
+
+  const setButlerOnce = (text: string) => {
+    if (!butlerLockedRef.current) {
+      setButlerAssessment(text);
+      butlerLockedRef.current = true;
+    }
+  };
 
   // Dynamiske høydepunkter kommer fra metrics.getHighlights i weeklyStats.highlights
 
@@ -357,7 +365,7 @@ export const App = () => {
             if (cachedObj?.summary) {
               cachedSummary = cachedObj.summary as string;
               console.log('[App] Using AI summary from localStorage cache');
-              setButlerAssessment(cachedSummary);
+              setButlerOnce(cachedSummary);
             }
           }
         } catch (_) {
@@ -380,7 +388,7 @@ export const App = () => {
               const aiData = await aiResponse.json();
               const summaryText: string = aiData.summary || '';
               console.log(`[App] Using cached AI summary for GW ${aiData.gameweek}: "${summaryText.substring(0, 50)}..."`);
-              setButlerAssessment(summaryText);
+              setButlerOnce(summaryText);
               try {
                 localStorage.setItem(aiCacheKey, JSON.stringify({ summary: summaryText, gameweek: currentGW }));
               } catch (_) {}
@@ -390,7 +398,7 @@ export const App = () => {
           } catch (aiError) {
             console.error('[App] Failed to fetch AI summary, generating fresh assessment:', aiError);
             const assessment = generateButlerAssessment({ weeklyStats: weekly });
-            setButlerAssessment(assessment);
+            setButlerOnce(assessment);
             try {
               localStorage.setItem(aiCacheKey, JSON.stringify({ summary: assessment, gameweek: currentGW }));
             } catch (_) {}
