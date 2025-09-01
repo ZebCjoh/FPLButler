@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { getHighlights } from './logic/metrics';
 import { generateButlerAssessment } from './logic/butler';
 
@@ -9,14 +9,6 @@ export const App = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [butlerAssessment, setButlerAssessment] = useState<string>('');
-  const butlerLockedRef = useRef<boolean>(false);
-
-  const setButlerOnce = (text: string) => {
-    if (!butlerLockedRef.current) {
-      setButlerAssessment(text);
-      butlerLockedRef.current = true;
-    }
-  };
 
   // Dynamiske høydepunkter kommer fra metrics.getHighlights i weeklyStats.highlights
 
@@ -357,25 +349,30 @@ export const App = () => {
         // Butler's Assessment: persistent per GW using localStorage
         // 1) Try cache first to avoid regenerating text on reloads
         const aiCacheKey = `ai-summary-gw-${currentGW}`;
-        let cachedSummary: string | null = null;
+        let finalAssessment: string | null = null;
+        
         try {
           const cached = typeof window !== 'undefined' ? localStorage.getItem(aiCacheKey) : null;
           if (cached) {
-            const cachedObj = JSON.parse(cached);
-            if (cachedObj?.summary) {
-              cachedSummary = cachedObj.summary as string;
-              console.log('[App] Using AI summary from localStorage cache');
-              setButlerOnce(cachedSummary);
+            try {
+              const cachedObj = JSON.parse(cached);
+              if (cachedObj?.summary && cachedObj?.gameweek === currentGW) {
+                finalAssessment = cachedObj.summary;
+                console.log(`[App] Using cached AI summary for GW ${currentGW}`);
+              }
+            } catch (parseError) {
+              console.warn('[App] Failed to parse cached AI summary, will regenerate');
+              localStorage.removeItem(aiCacheKey);
             }
           }
-        } catch (_) {
-          // ignore cache read errors
+        } catch (cacheError) {
+          console.warn('[App] localStorage not available, will generate fresh summary');
         }
 
-        // 2) Fetch cached AI summary from API or static fallback (only if we did NOT find cache)
-        if (!cachedSummary) {
+        // 2) Fetch cached AI summary from API or static fallback (only if we did NOT find valid cache)
+        if (!finalAssessment) {
           try {
-            console.log('[App] Fetching cached AI summary...');
+            console.log('[App] No valid cache found. Fetching AI summary from API...');
             let aiResponse = await fetch('/api/ai-summary');
 
             // If API endpoint fails (e.g., in dev mode), try static fallback
@@ -386,23 +383,46 @@ export const App = () => {
 
             if (aiResponse.ok) {
               const aiData = await aiResponse.json();
-              const summaryText: string = aiData.summary || '';
-              console.log(`[App] Using cached AI summary for GW ${aiData.gameweek}: "${summaryText.substring(0, 50)}..."`);
-              setButlerOnce(summaryText);
+              finalAssessment = aiData.summary || '';
+              console.log(`[App] Using fetched AI summary for GW ${aiData.gameweek}: "${finalAssessment ? finalAssessment.substring(0, 50) : 'empty'}..."`);
+              
+              // Store in cache
               try {
-                localStorage.setItem(aiCacheKey, JSON.stringify({ summary: summaryText, gameweek: currentGW }));
-              } catch (_) {}
+                if (typeof window !== 'undefined') {
+                  localStorage.setItem(aiCacheKey, JSON.stringify({ 
+                    summary: finalAssessment, 
+                    gameweek: currentGW,
+                    cachedAt: new Date().toISOString()
+                  }));
+                }
+              } catch (_) {
+                console.warn('[App] Failed to cache AI summary to localStorage');
+              }
             } else {
               throw new Error('Both API and static fallback failed');
             }
           } catch (aiError) {
-            console.error('[App] Failed to fetch AI summary, generating fresh assessment:', aiError);
-            const assessment = generateButlerAssessment({ weeklyStats: weekly });
-            setButlerOnce(assessment);
+            console.log('[App] Failed to fetch AI summary from API/fallback, generating fresh assessment');
+            finalAssessment = generateButlerAssessment({ weeklyStats: weekly });
+            console.log(`[App] Generated new summary for GW ${currentGW} and cached`);
+            
+            // Store in cache
             try {
-              localStorage.setItem(aiCacheKey, JSON.stringify({ summary: assessment, gameweek: currentGW }));
-            } catch (_) {}
+              if (typeof window !== 'undefined') {
+                localStorage.setItem(aiCacheKey, JSON.stringify({ 
+                  summary: finalAssessment, 
+                  gameweek: currentGW,
+                  cachedAt: new Date().toISOString()
+                }));
+              }
+            } catch (_) {
+              console.warn('[App] Failed to cache generated AI summary to localStorage');
+            }
           }
+        }
+        
+        if (finalAssessment) {
+          setButlerAssessment(finalAssessment);
         }
         setError(null);
     } catch (err) {
