@@ -346,78 +346,48 @@ export const App = () => {
         console.debug('[Weekly] form counts -> hot:', weekly.formTable.hotStreak.length, 'cold:', weekly.formTable.coldStreak.length);
         setWeeklyStats(weekly);
         
-        // Butler's Assessment: persistent per GW using localStorage
-        // 1) Try cache first to avoid regenerating text on reloads
-        const aiCacheKey = `ai-summary-gw-${currentGW}`;
+        // Butler's Assessment: 100% consistent using single stable cache key
+        const aiCacheKey = 'ai-summary-current';
         let finalAssessment: string | null = null;
         
+        // 1) Try localStorage first
         try {
           const cached = typeof window !== 'undefined' ? localStorage.getItem(aiCacheKey) : null;
           if (cached) {
             try {
               const cachedObj = JSON.parse(cached);
-              if (cachedObj?.summary && cachedObj?.gameweek === currentGW) {
+              if (cachedObj?.summary) {
                 finalAssessment = cachedObj.summary;
-                console.log(`[App] Using cached AI summary for GW ${currentGW}`);
+                console.log('[App] Using cached AI summary');
               }
             } catch (parseError) {
-              console.warn('[App] Failed to parse cached AI summary, will regenerate');
-              localStorage.removeItem(aiCacheKey);
+              console.warn('[App] Failed to parse cached AI summary, removing invalid cache');
+              if (typeof window !== 'undefined') {
+                localStorage.removeItem(aiCacheKey);
+              }
             }
           }
         } catch (cacheError) {
-          console.warn('[App] localStorage not available, will generate fresh summary');
+          console.warn('[App] localStorage not available');
         }
 
-        // 2) Fetch cached AI summary from API or static fallback (only if we did NOT find valid cache)
+        // 2) Generate new summary only if no valid cache exists
         if (!finalAssessment) {
+          console.log('[App] No cached summary found, generating new one...');
+          finalAssessment = generateButlerAssessment({ weeklyStats: weekly });
+          console.log('[App] Generated and cached new summary');
+          
+          // Store in cache immediately
           try {
-            console.log('[App] No valid cache found. Fetching AI summary from API...');
-            let aiResponse = await fetch('/api/ai-summary');
-
-            // If API endpoint fails (e.g., in dev mode), try static fallback
-            if (!aiResponse.ok) {
-              console.log('[App] API endpoint failed, trying static fallback...');
-              aiResponse = await fetch('/ai-summary-fallback.json');
+            if (typeof window !== 'undefined') {
+              localStorage.setItem(aiCacheKey, JSON.stringify({ 
+                summary: finalAssessment,
+                generatedAt: new Date().toISOString(),
+                gameweek: currentGW
+              }));
             }
-
-            if (aiResponse.ok) {
-              const aiData = await aiResponse.json();
-              finalAssessment = aiData.summary || '';
-              console.log(`[App] Using fetched AI summary for GW ${aiData.gameweek}: "${finalAssessment ? finalAssessment.substring(0, 50) : 'empty'}..."`);
-              
-              // Store in cache
-              try {
-                if (typeof window !== 'undefined') {
-                  localStorage.setItem(aiCacheKey, JSON.stringify({ 
-                    summary: finalAssessment, 
-                    gameweek: currentGW,
-                    cachedAt: new Date().toISOString()
-                  }));
-                }
-              } catch (_) {
-                console.warn('[App] Failed to cache AI summary to localStorage');
-              }
-            } else {
-              throw new Error('Both API and static fallback failed');
-            }
-          } catch (aiError) {
-            console.log('[App] Failed to fetch AI summary from API/fallback, generating fresh assessment');
-            finalAssessment = generateButlerAssessment({ weeklyStats: weekly });
-            console.log(`[App] Generated new summary for GW ${currentGW} and cached`);
-            
-            // Store in cache
-            try {
-              if (typeof window !== 'undefined') {
-                localStorage.setItem(aiCacheKey, JSON.stringify({ 
-                  summary: finalAssessment, 
-                  gameweek: currentGW,
-                  cachedAt: new Date().toISOString()
-                }));
-              }
-            } catch (_) {
-              console.warn('[App] Failed to cache generated AI summary to localStorage');
-            }
+          } catch (cacheStoreError) {
+            console.warn('[App] Failed to store AI summary in localStorage:', cacheStoreError);
           }
         }
         
