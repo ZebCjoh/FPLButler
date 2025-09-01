@@ -1,45 +1,30 @@
-import { VercelRequest, VercelResponse } from '@vercel/node';
-import { get } from '@vercel/blob';
-
-interface AISummary {
-  gameweek: number;
-  summary: string;
-  generatedAt: string;
-}
+import { type VercelRequest, type VercelResponse } from '@vercel/node';
+import { put, get } from '@vercel/blob';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
-
   try {
-    console.log('[AI Summary API] Fetching cached AI summary from fpl-butler-blob...');
-    
-    // Try to get the cached AI summary from Vercel Blob
-    const blob = await get('ai-summary.json');
-    
-    if (!blob) {
-      console.log('[AI Summary API] No cached summary found');
-      return res.status(404).json({ 
-        error: 'No AI summary found'
-      });
+    if (req.method === 'POST') {
+      // Lagre en test-summary i blob
+      const { url } = await put('ai-summary.json', JSON.stringify({
+        gameweek: 3,
+        summary: "Dette er en testoppsummering fra backend. Skal være identisk på alle refresh."
+      }), { access: 'public', contentType: 'application/json' });
+      return res.status(200).json({ success: true, url });
     }
 
-    const summaryText = await blob.text();
-    const summaryData: AISummary = JSON.parse(summaryText);
-    
-    console.log(`[AI Summary API] Serving cached summary for GW ${summaryData.gameweek}`);
-    
-    // Set cache headers to cache for 1 hour (since this is build-time generated)
-    res.setHeader('Content-Type', 'application/json');
-    res.setHeader('Cache-Control', 's-maxage=3600, stale-while-revalidate=7200');
-    
-    return res.status(200).json(summaryData);
-    
-  } catch (error) {
-    console.error('[AI Summary API] Error fetching AI summary:', error);
-    return res.status(500).json({
-      error: 'Failed to fetch AI summary'
-    });
+    if (req.method === 'GET') {
+      // Hent summary fra blob
+      const { body } = await get('ai-summary.json');
+      if (!body) {
+        return res.status(404).json({ error: 'No summary found yet' });
+      }
+      const text = await body.text();
+      return res.status(200).json(JSON.parse(text));
+    }
+
+    return res.status(405).json({ error: 'Method not allowed' });
+  } catch (error: any) {
+    console.error(error);
+    return res.status(500).json({ error: error.message || 'Server error' });
   }
 }
