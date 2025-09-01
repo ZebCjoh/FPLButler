@@ -349,21 +349,23 @@ export const App = () => {
         // Butler's Assessment: persistent per GW using localStorage
         // 1) Try cache first to avoid regenerating text on reloads
         const aiCacheKey = `ai-summary-gw-${currentGW}`;
+        let cachedSummary: string | null = null;
         try {
           const cached = typeof window !== 'undefined' ? localStorage.getItem(aiCacheKey) : null;
           if (cached) {
             const cachedObj = JSON.parse(cached);
             if (cachedObj?.summary) {
+              cachedSummary = cachedObj.summary as string;
               console.log('[App] Using AI summary from localStorage cache');
-              setButlerAssessment(cachedObj.summary);
+              setButlerAssessment(cachedSummary);
             }
           }
         } catch (_) {
           // ignore cache read errors
         }
 
-        // 2) Fetch cached AI summary from API or static fallback (only if not already set)
-        if (!butlerAssessment) {
+        // 2) Fetch cached AI summary from API or static fallback (only if we did NOT find cache)
+        if (!cachedSummary) {
           try {
             console.log('[App] Fetching cached AI summary...');
             let aiResponse = await fetch('/api/ai-summary');
