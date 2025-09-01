@@ -346,12 +346,25 @@ export const App = () => {
         console.debug('[Weekly] form counts -> hot:', weekly.formTable.hotStreak.length, 'cold:', weekly.formTable.coldStreak.length);
         setWeeklyStats(weekly);
         
-        // Generate Butler's Assessment based on gameweek data
-        const assessment = generateButlerAssessment({
-          weeklyStats: weekly
-        });
-        
-        setButlerAssessment(assessment);
+        // Fetch cached Butler's Assessment 
+        try {
+          console.log('[App] Fetching cached AI summary...');
+          const aiResponse = await fetch('/api/ai-summary');
+          if (aiResponse.ok) {
+            const aiData = await aiResponse.json();
+            console.log(`[App] Using cached AI summary for GW ${aiData.gameweek}: "${aiData.summary.substring(0, 50)}..."`);
+            setButlerAssessment(aiData.summary);
+          } else {
+            // Fallback to live generation if no cached summary
+            console.log('[App] No cached AI summary, generating fallback...');
+            const assessment = generateButlerAssessment({ weeklyStats: weekly });
+            setButlerAssessment(assessment);
+          }
+        } catch (aiError) {
+          console.error('[App] Failed to fetch AI summary, using fallback:', aiError);
+          const assessment = generateButlerAssessment({ weeklyStats: weekly });
+          setButlerAssessment(assessment);
+        }
         setError(null);
     } catch (err) {
         console.error('Error fetching data:', err);

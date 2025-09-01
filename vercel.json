@@ -37,6 +37,10 @@
     "api/cron/test.ts": {
       "memory": 512,
       "maxDuration": 60
+    },
+    "api/ai-summary.ts": {
+      "memory": 512,
+      "maxDuration": 30
     }
   },
   "rewrites": [
