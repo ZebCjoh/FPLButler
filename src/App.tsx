@@ -346,28 +346,53 @@ export const App = () => {
         console.debug('[Weekly] form counts -> hot:', weekly.formTable.hotStreak.length, 'cold:', weekly.formTable.coldStreak.length);
         setWeeklyStats(weekly);
         
-        // Fetch cached Butler's Assessment with multiple fallbacks
+        // Butler's Assessment: persistent per GW using localStorage
+        // 1) Try cache first to avoid regenerating text on reloads
+        const aiCacheKey = `ai-summary-gw-${currentGW}`;
         try {
-          console.log('[App] Fetching cached AI summary...');
-          let aiResponse = await fetch('/api/ai-summary');
-          
-          // If API endpoint fails (e.g., in dev mode), try static fallback
-          if (!aiResponse.ok) {
-            console.log('[App] API endpoint failed, trying static fallback...');
-            aiResponse = await fetch('/ai-summary-fallback.json');
+          const cached = typeof window !== 'undefined' ? localStorage.getItem(aiCacheKey) : null;
+          if (cached) {
+            const cachedObj = JSON.parse(cached);
+            if (cachedObj?.summary) {
+              console.log('[App] Using AI summary from localStorage cache');
+              setButlerAssessment(cachedObj.summary);
+            }
           }
-          
-          if (aiResponse.ok) {
-            const aiData = await aiResponse.json();
-            console.log(`[App] Using cached AI summary for GW ${aiData.gameweek}: "${aiData.summary.substring(0, 50)}..."`);
-            setButlerAssessment(aiData.summary);
-          } else {
-            throw new Error('Both API and static fallback failed');
+        } catch (_) {
+          // ignore cache read errors
+        }
+
+        // 2) Fetch cached AI summary from API or static fallback (only if not already set)
+        if (!butlerAssessment) {
+          try {
+            console.log('[App] Fetching cached AI summary...');
+            let aiResponse = await fetch('/api/ai-summary');
+
+            // If API endpoint fails (e.g., in dev mode), try static fallback
+            if (!aiResponse.ok) {
+              console.log('[App] API endpoint failed, trying static fallback...');
+              aiResponse = await fetch('/ai-summary-fallback.json');
+            }
+
+            if (aiResponse.ok) {
+              const aiData = await aiResponse.json();
+              const summaryText: string = aiData.summary || '';
+              console.log(`[App] Using cached AI summary for GW ${aiData.gameweek}: "${summaryText.substring(0, 50)}..."`);
+              setButlerAssessment(summaryText);
+              try {
+                localStorage.setItem(aiCacheKey, JSON.stringify({ summary: summaryText, gameweek: currentGW }));
+              } catch (_) {}
+            } else {
+              throw new Error('Both API and static fallback failed');
+            }
+          } catch (aiError) {
+            console.error('[App] Failed to fetch AI summary, generating fresh assessment:', aiError);
+            const assessment = generateButlerAssessment({ weeklyStats: weekly });
+            setButlerAssessment(assessment);
+            try {
+              localStorage.setItem(aiCacheKey, JSON.stringify({ summary: assessment, gameweek: currentGW }));
+            } catch (_) {}
           }
-        } catch (aiError) {
-          console.error('[App] Failed to fetch AI summary, generating fresh assessment:', aiError);
-          const assessment = generateButlerAssessment({ weeklyStats: weekly });
-          setButlerAssessment(assessment);
         }
         setError(null);
     } catch (err) {
