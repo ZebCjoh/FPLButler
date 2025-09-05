@@ -1,21 +1,26 @@
-import { VercelRequest, VercelResponse } from '@vercel/node';
-
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export default async function handler(req: Request): Promise<Response> {
   if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+      status: 405,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 
-  const { leagueId } = req.query;
+  const url = new URL(req.url);
+  const leagueId = url.pathname.split('/')[2]; // Extract leagueId from path
 
-  if (!leagueId || Array.isArray(leagueId)) {
-    return res.status(400).json({ error: 'Invalid league ID' });
+  if (!leagueId) {
+    return new Response(JSON.stringify({ error: 'Invalid league ID' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 
   try {
     console.log(`[API] Fetching league ${leagueId} standings...`);
     
-    const url = `https://fantasy.premierleague.com/api/leagues-classic/${leagueId}/standings/`;
-    const response = await fetch(url, {
+    const apiUrl = `https://fantasy.premierleague.com/api/leagues-classic/${leagueId}/standings/`;
+    const response = await fetch(apiUrl, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (compatible; FPL-Butler/1.0)',
         'Accept': 'application/json, text/plain, */*',
@@ -26,35 +31,46 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (!response.ok) {
       console.error(`[API] League ${leagueId} failed:`, response.status, response.statusText);
-      return res.status(response.status).json({ 
+      return new Response(JSON.stringify({ 
         error: `FPL API returned ${response.status}`,
-        url 
+        url: apiUrl
+      }), {
+        status: response.status,
+        headers: { 'Content-Type': 'application/json' }
       });
     }
 
     const contentType = response.headers.get('content-type') || '';
     if (!contentType.includes('application/json')) {
       console.error(`[API] League ${leagueId} non-JSON response:`, contentType);
-      return res.status(500).json({ 
+      return new Response(JSON.stringify({ 
         error: 'Expected JSON response from FPL API',
         contentType 
+      }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' }
       });
     }
 
     const data = await response.json();
     
-    // Set cache headers
-    res.setHeader('Content-Type', 'application/json');
-    res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=300');
-    
     console.log(`[API] League ${leagueId} success`);
-    return res.status(200).json(data);
+    return new Response(JSON.stringify(data), {
+      status: 200,
+      headers: { 
+        'Content-Type': 'application/json',
+        'Cache-Control': 's-maxage=60, stale-while-revalidate=300'
+      }
+    });
 
   } catch (error) {
     console.error(`[API] League ${leagueId} error:`, error);
-    return res.status(500).json({ 
+    return new Response(JSON.stringify({ 
       error: 'Failed to fetch from FPL API',
       message: error instanceof Error ? error.message : 'Unknown error'
+    }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
     });
   }
 }

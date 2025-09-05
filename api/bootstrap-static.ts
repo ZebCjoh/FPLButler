@@ -1,8 +1,9 @@
-import { VercelRequest, VercelResponse } from '@vercel/node';
-
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export default async function handler(req: Request): Promise<Response> {
   if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+      status: 405,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 
   try {
@@ -74,16 +75,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
       if (!fb.ok) {
         console.error('[API] [v2] Bootstrap fallback failed:', fb.status, fb.statusText);
-        return res.status(response.status).json({ 
+        return new Response(JSON.stringify({ 
           error: `FPL API returned ${response.status} and fallback ${fb.status}`,
           url: primaryUrl
+        }), {
+          status: response.status,
+          headers: { 'Content-Type': 'application/json' }
         });
       }
       const fbData = await parseJsonFlexible(fb);
-      res.setHeader('Content-Type', 'application/json');
-      res.setHeader('Cache-Control', 's-maxage=120, stale-while-revalidate=120');
       console.log('[API] [v2] Bootstrap success via fallback');
-      return res.status(200).json(fbData);
+      return new Response(JSON.stringify(fbData), {
+        status: 200,
+        headers: { 
+          'Content-Type': 'application/json',
+          'Cache-Control': 's-maxage=120, stale-while-revalidate=120'
+        }
+      });
     }
 
     const contentType = response.headers.get('content-type') || '';
@@ -100,28 +108,35 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
       if (!fb.ok) {
         console.error('[API] [v2] Bootstrap fallback after parse failure failed:', fb.status, fb.statusText);
-        return res.status(500).json({ 
+        return new Response(JSON.stringify({ 
           error: 'Expected JSON response from FPL API',
           contentType
+        }), {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' }
         });
       }
       data = await parseJsonFlexible(fb);
-      res.setHeader('Cache-Control', 's-maxage=120, stale-while-revalidate=120');
       console.log('[API] [v2] Bootstrap success via fallback after parse error');
     }
     
-    // Set cache headers
-    res.setHeader('Content-Type', 'application/json');
-    res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=600');
-    
     console.log('[API] Bootstrap success v2');
-    return res.status(200).json(data);
+    return new Response(JSON.stringify(data), {
+      status: 200,
+      headers: { 
+        'Content-Type': 'application/json',
+        'Cache-Control': 's-maxage=300, stale-while-revalidate=600'
+      }
+    });
 
   } catch (error) {
     console.error('[API] Bootstrap error:', error);
-    return res.status(500).json({ 
+    return new Response(JSON.stringify({ 
       error: 'Failed to fetch from FPL API',
       message: error instanceof Error ? error.message : 'Unknown error'
+    }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
     });
   }
 }

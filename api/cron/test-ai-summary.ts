@@ -1,13 +1,15 @@
-import { VercelRequest, VercelResponse } from '@vercel/node';
 import { put } from '@vercel/blob';
 
 /**
  * Test endpoint to generate a dummy AI summary and store it in Vercel Blob
  * This helps verify the blob storage integration works correctly
  */
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export default async function handler(req: Request): Promise<Response> {
   if (req.method !== 'POST' && req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+      status: 405,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 
   try {
@@ -26,20 +28,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     console.log(`[Test AI] Stored test AI summary in blob: ${blob.url}`);
     
-    return res.status(200).json({
+    return new Response(JSON.stringify({
       success: true,
       message: 'Test AI summary generated and stored successfully',
       data: testData,
       blobUrl: blob.url,
       nextStep: 'Visit /api/ai-summary to verify the stored summary can be retrieved'
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
     });
     
   } catch (error) {
     console.error('[Test AI] Error generating test AI summary:', error);
-    return res.status(500).json({
+    return new Response(JSON.stringify({
       success: false,
       error: 'Failed to generate test AI summary',
       details: error instanceof Error ? error.message : 'Unknown error'
+    }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
     });
   }
 }

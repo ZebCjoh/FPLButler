@@ -1,7 +1,6 @@
-import { type VercelRequest, type VercelResponse } from '@vercel/node';
 import { put, get } from '@vercel/blob';
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export default async function handler(req: Request): Promise<Response> {
   try {
     if (req.method === 'POST') {
       // Lagre en test-summary i blob
@@ -9,22 +8,37 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         gameweek: 3,
         summary: "Dette er en testoppsummering fra backend. Skal være identisk på alle refresh."
       }), { access: 'public', contentType: 'application/json' });
-      return res.status(200).json({ success: true, url });
+      return new Response(JSON.stringify({ success: true, url }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      });
     }
 
     if (req.method === 'GET') {
       // Hent summary fra blob
-      const { body } = await get('ai-summary.json');
-      if (!body) {
-        return res.status(404).json({ error: 'No summary found yet' });
+      const blob = await get('ai-summary.json');
+      if (!blob) {
+        return new Response(JSON.stringify({ error: 'No summary found yet' }), {
+          status: 404,
+          headers: { 'Content-Type': 'application/json' }
+        });
       }
-      const text = await body.text();
-      return res.status(200).json(JSON.parse(text));
+      const text = await blob.text();
+      return new Response(text, {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      });
     }
 
-    return res.status(405).json({ error: 'Method not allowed' });
+    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+      status: 405,
+      headers: { 'Content-Type': 'application/json' }
+    });
   } catch (error: any) {
     console.error(error);
-    return res.status(500).json({ error: error.message || 'Server error' });
+    return new Response(JSON.stringify({ error: error.message || 'Server error' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 }

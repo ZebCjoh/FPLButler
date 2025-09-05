@@ -11,7 +11,6 @@
     },
     "dependencies": {
         "@vercel/blob": "^0.15.1",
-        "@vercel/node": "^5.3.17",
         "react": "^18.2.0",
         "react-dom": "^18.2.0"
     },
