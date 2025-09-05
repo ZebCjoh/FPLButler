@@ -1,5 +1,3 @@
-import { put } from '@vercel/blob';
-
 export const config = {
   runtime: 'edge'
 };
@@ -16,24 +14,12 @@ export default async function handler(req: Request): Promise<Response> {
       });
     }
 
-    // Generer en test AI-summary og lagre i blob
-    const testSummary = {
-      gw: 3,
-      summary: "Dette er en testoppsummering fra backend. Skal være identisk på alle refresh."
-    };
-
-    const { url } = await put('ai-summary.json', JSON.stringify(testSummary), {
-      access: 'public',
-      contentType: 'application/json'
-    });
-
-    return new Response(JSON.stringify({
-      success: true,
-      message: 'Test AI summary created',
-      url: url,
-      data: testSummary
-    }), {
-      status: 200,
+    // Deleger til /api/ai-summary (POST) for å opprette testfil i Blob
+    const origin = new URL(req.url).origin;
+    const resp = await fetch(`${origin}/api/ai-summary`, { method: 'POST' });
+    const text = await resp.text();
+    return new Response(text, {
+      status: resp.status,
       headers: {
         'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': '*'

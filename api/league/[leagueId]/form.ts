@@ -127,7 +127,7 @@ export default async function handler(req: Request): Promise<Response> {
 
     // Step 3: Calculate actual window based on current GW
     const actualWindow = Math.min(window, currentGw);
-    const gameweeksToCheck = [];
+    const gameweeksToCheck: number[] = [];
     for (let i = 0; i < actualWindow; i++) {
       const gw = currentGw - i;
       if (gw >= 1) {

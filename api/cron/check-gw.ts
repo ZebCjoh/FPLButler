@@ -66,7 +66,7 @@ async function generateAISummaryForGW(gameweek: number): Promise<string> {
       throw new Error('Failed to fetch FPL data for AI summary');
     }
 
-    const [bootstrapData, leagueData] = await Promise.all([
+    const [, leagueData] = await Promise.all([
       bootstrapResponse.json(),
       leagueResponse.json()
     ]);
