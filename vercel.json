@@ -6,9 +6,6 @@
     }
   ],
   "functions": {
-    "api/**/*.ts": {
-      "runtime": "edge"
-    },
     "api/bootstrap-static.ts": {
       "memory": 1024,
       "maxDuration": 30
