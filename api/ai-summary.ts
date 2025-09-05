@@ -40,8 +40,12 @@ export default async function handler(req: Request): Promise<Response> {
         clearTimeout(timeout);
 
         if (!resp.ok) {
-          return new Response(JSON.stringify({ error: 'No summary found yet' }), {
-            status: 404,
+          return new Response(JSON.stringify({
+            ok: false,
+            error: 'No summary found yet',
+            summary: '🍷 Ingen oppsummering tilgjengelig ennå. Kom tilbake senere.'
+          }), {
+            status: 200,
             headers: {
               'Content-Type': 'application/json',
               'Access-Control-Allow-Origin': '*'
@@ -57,8 +61,12 @@ export default async function handler(req: Request): Promise<Response> {
           }
         });
       } catch (e) {
-        return new Response(JSON.stringify({ error: 'Blob fetch failed' }), {
-          status: 404,
+        return new Response(JSON.stringify({
+          ok: false,
+          error: 'Blob fetch failed',
+          summary: '🍷 Ingen oppsummering tilgjengelig ennå (midlertidig fallback).'
+        }), {
+          status: 200,
           headers: {
             'Content-Type': 'application/json',
             'Access-Control-Allow-Origin': '*'
