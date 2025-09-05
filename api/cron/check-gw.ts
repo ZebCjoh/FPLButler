@@ -1,4 +1,4 @@
-import { get, put } from '@vercel/blob';
+import { list, put } from '@vercel/blob';
 import { generateButlerAssessment } from '../../src/logic/butler';
 
 // Types for FPL API and our storage
@@ -157,9 +157,10 @@ export async function runCheck(): Promise<CheckResult> {
 
     // 3. Get last processed state from Vercel Blob
     try {
-      const blob = await get('fpl-butler/last-processed.json');
-      if (blob) {
-        const stateText = await blob.text();
+      const { blobs } = await list();
+      const stateBlob = blobs.find((b: any) => b.pathname === 'fpl-butler/last-processed.json');
+      if (stateBlob) {
+        const stateText = await (await fetch(stateBlob.url)).text();
         const state: ProcessedState = JSON.parse(stateText);
         lastProcessedGwBefore = state.lastProcessedGw;
         console.log(`[Cron] Last processed GW: ${lastProcessedGwBefore}`);
@@ -186,6 +187,7 @@ export async function runCheck(): Promise<CheckResult> {
 
       // Store AI summary in Blob (uses fpl-butler-blob storage)
       await put('ai-summary.json', JSON.stringify(aiSummaryData, null, 2), {
+        access: 'public',
         contentType: 'application/json'
       });
 
@@ -198,6 +200,7 @@ export async function runCheck(): Promise<CheckResult> {
       };
 
       await put('fpl-butler/last-processed.json', JSON.stringify(newState, null, 2), {
+        access: 'public',
         contentType: 'application/json'
       });
 

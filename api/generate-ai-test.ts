@@ -88,6 +88,7 @@ export default async function handler(req: Request): Promise<Response> {
 
     // Store AI summary in Blob (uses fpl-butler-blob storage)
     await put('ai-summary.json', JSON.stringify(aiSummaryData, null, 2), {
+      access: 'public',
       contentType: 'application/json'
     });
 

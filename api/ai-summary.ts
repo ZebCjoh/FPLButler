@@ -1,8 +1,4 @@
-import { put, get } from '@vercel/blob';
-
-export const config = {
-  runtime: 'edge'
-};
+import { put, list } from '@vercel/blob';
 
 export default async function handler(req: Request): Promise<Response> {
   try {
@@ -34,9 +30,10 @@ export default async function handler(req: Request): Promise<Response> {
     }
 
     if (req.method === 'GET') {
-      // Hent summary fra blob
-      const blob = await get('ai-summary.json');
-      if (!blob) {
+      // Hent summary fra blob (bruk list for å finne offentlig URL)
+      const { blobs } = await list();
+      const match = blobs.find((b: any) => b.pathname === 'ai-summary.json');
+      if (!match) {
         return new Response(JSON.stringify({ error: 'No summary found yet' }), {
           status: 404,
           headers: {
@@ -45,7 +42,8 @@ export default async function handler(req: Request): Promise<Response> {
           }
         });
       }
-      const text = await blob.text();
+      const resp = await fetch(match.url);
+      const text = await resp.text();
       return new Response(text, {
         status: 200,
         headers: {

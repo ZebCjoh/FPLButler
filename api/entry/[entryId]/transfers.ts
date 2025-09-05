@@ -25,19 +25,19 @@ export default async function handler(req: Request): Promise<Response> {
 
     if (!response.ok) {
       console.error(`[API] Entry ${entryId} transfers failed:`, response.status, response.statusText);
-      return res.status(response.status).json({ 
+      return new Response(JSON.stringify({
         error: `FPL API returned ${response.status}`,
-        url 
-      });
+        url
+      }), { status: response.status, headers: { 'Content-Type': 'application/json' } });
     }
 
     const contentType = response.headers.get('content-type') || '';
     if (!contentType.includes('application/json')) {
       console.error(`[API] Entry ${entryId} transfers non-JSON response:`, contentType);
-      return res.status(500).json({ 
+      return new Response(JSON.stringify({
         error: 'Expected JSON response from FPL API',
-        contentType 
-      });
+        contentType
+      }), { status: 500, headers: { 'Content-Type': 'application/json' } });
     }
 
     const data = await response.json();

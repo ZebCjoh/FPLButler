@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test AI Summary API</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 50px auto; padding: 20px; }
+        button { background: #007acc; color: white; border: none; padding: 10px 20px; margin: 10px 0; cursor: pointer; border-radius: 5px; }
+        button:hover { background: #005a9e; }
+        pre { background: #f5f5f5; padding: 15px; border-radius: 5px; overflow-x: auto; }
+        .error { color: red; }
+        .success { color: green; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Test AI Summary API</h1>
+    
+    <h2>Step 1: Create AI Summary (POST)</h2>
+    <button onclick="createSummary()">POST /api/ai-summary</button>
+    <div id="postResult"></div>
+
+    <h2>Step 2: Get AI Summary (GET)</h2>
+    <button onclick="getSummary()">GET /api/ai-summary</button>
+    <div id="getResult"></div>
+
+    <h2>Test with production URL</h2>
+    <button onclick="testProduction()">Test Production API</button>
+    <div id="prodResult"></div>
+
+    <script>
+        async function createSummary() {
+            const resultDiv = document.getElementById('postResult');
+            resultDiv.innerHTML = '<p>Creating summary...</p>';
+            
+            try {
+                const response = await fetch('/api/ai-summary', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.innerHTML = `<pre class="success">${JSON.stringify(data, null, 2)}</pre>`;
+                } else {
+                    resultDiv.innerHTML = `<pre class="error">Error ${response.status}: ${JSON.stringify(data, null, 2)}</pre>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<pre class="error">Network error: ${error.message}</pre>`;
+            }
+        }
+
+        async function getSummary() {
+            const resultDiv = document.getElementById('getResult');
+            resultDiv.innerHTML = '<p>Getting summary...</p>';
+            
+            try {
+                const response = await fetch('/api/ai-summary', {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.innerHTML = `<pre class="success">${JSON.stringify(data, null, 2)}</pre>`;
+                } else {
+                    resultDiv.innerHTML = `<pre class="error">Error ${response.status}: ${JSON.stringify(data, null, 2)}</pre>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<pre class="error">Network error: ${error.message}</pre>`;
+            }
+        }
+
+        async function testProduction() {
+            const resultDiv = document.getElementById('prodResult');
+            resultDiv.innerHTML = '<p>Testing production...</p>';
+            
+            try {
+                // First try POST to create
+                const postResponse = await fetch('https://www.fplbutler.app/api/ai-summary', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                let postData;
+                try {
+                    postData = await postResponse.json();
+                } catch {
+                    postData = await postResponse.text();
+                }
+                
+                // Then try GET
+                const getResponse = await fetch('https://www.fplbutler.app/api/ai-summary', {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                let getData;
+                try {
+                    getData = await getResponse.json();
+                } catch {
+                    getData = await getResponse.text();
+                }
+                
+                resultDiv.innerHTML = `
+                    <h3>POST Result:</h3>
+                    <pre class="${postResponse.ok ? 'success' : 'error'}">Status: ${postResponse.status}
+${JSON.stringify(postData, null, 2)}</pre>
+                    
+                    <h3>GET Result:</h3>
+                    <pre class="${getResponse.ok ? 'success' : 'error'}">Status: ${getResponse.status}
+${JSON.stringify(getData, null, 2)}</pre>
+                `;
+            } catch (error) {
+                resultDiv.innerHTML = `<pre class="error">Network error: ${error.message}</pre>`;
+            }
+        }
+    </script>
+</body>
+</html>
