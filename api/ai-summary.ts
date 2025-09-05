@@ -1,4 +1,4 @@
-import { put, list } from '@vercel/blob';
+import { put } from '@vercel/blob';
 
 export default async function handler(req: Request): Promise<Response> {
   try {
@@ -30,11 +30,34 @@ export default async function handler(req: Request): Promise<Response> {
     }
 
     if (req.method === 'GET') {
-      // Hent summary fra blob (bruk list for å finne offentlig URL)
-      const { blobs } = await list();
-      const match = blobs.find((b: any) => b.pathname === 'ai-summary.json');
-      if (!match) {
-        return new Response(JSON.stringify({ error: 'No summary found yet' }), {
+      // Hent direkte fra offentlig Blob-URL for å unngå Edge-avhengigheter
+      const defaultUrl = 'https://fpl-butler-blob.public.blob.vercel-storage.com/ai-summary.json';
+      const blobUrl = (process.env as any).BLOB_PUBLIC_AI_SUMMARY_URL || defaultUrl;
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 5000);
+        const resp = await fetch(blobUrl, { cache: 'no-store', signal: controller.signal });
+        clearTimeout(timeout);
+
+        if (!resp.ok) {
+          return new Response(JSON.stringify({ error: 'No summary found yet' }), {
+            status: 404,
+            headers: {
+              'Content-Type': 'application/json',
+              'Access-Control-Allow-Origin': '*'
+            }
+          });
+        }
+        const text = await resp.text();
+        return new Response(text, {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*'
+          }
+        });
+      } catch (e) {
+        return new Response(JSON.stringify({ error: 'Blob fetch failed' }), {
           status: 404,
           headers: {
             'Content-Type': 'application/json',
@@ -42,15 +65,6 @@ export default async function handler(req: Request): Promise<Response> {
           }
         });
       }
-      const resp = await fetch(match.url);
-      const text = await resp.text();
-      return new Response(text, {
-        status: 200,
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*'
-        }
-      });
     }
 
     return new Response(JSON.stringify({ error: 'Method not allowed' }), {
