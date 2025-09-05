@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/cron/check-gw",
-      "schedule": "0 * * * *"
+      "schedule": "0 10 * * *"
     }
   ],
   "functions": {
