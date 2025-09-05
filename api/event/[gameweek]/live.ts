@@ -1,14 +1,13 @@
-import { VercelRequest, VercelResponse } from '@vercel/node';
-
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export default async function handler(req: Request): Promise<Response> {
   if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405, headers: { 'Content-Type': 'application/json' } });
   }
 
-  const { gameweek } = req.query;
-
-  if (!gameweek || Array.isArray(gameweek)) {
-    return res.status(400).json({ error: 'Invalid gameweek' });
+  const urlObj = new URL(req.url);
+  const segments = urlObj.pathname.split('/');
+  const gameweek = segments[3];
+  if (!gameweek) {
+    return new Response(JSON.stringify({ error: 'Invalid gameweek' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
   }
 
   try {
@@ -42,19 +41,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const data = await response.json();
-    
-    // Set cache headers - live data changes frequently
-    res.setHeader('Content-Type', 'application/json');
-    res.setHeader('Cache-Control', 's-maxage=30, stale-while-revalidate=60');
-    
     console.log(`[API] Gameweek ${gameweek} live success`);
-    return res.status(200).json(data);
+    return new Response(JSON.stringify(data), { status: 200, headers: { 'Content-Type': 'application/json', 'Cache-Control': 's-maxage=30, stale-while-revalidate=60' } });
 
   } catch (error) {
     console.error(`[API] Gameweek ${gameweek} live error:`, error);
-    return res.status(500).json({ 
-      error: 'Failed to fetch from FPL API',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    });
+    return new Response(JSON.stringify({ error: 'Failed to fetch from FPL API', message: error instanceof Error ? error.message : 'Unknown error' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
   }
 }

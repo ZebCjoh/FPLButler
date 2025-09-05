@@ -1,4 +1,3 @@
-import { VercelRequest, VercelResponse } from '@vercel/node';
 import { put } from '@vercel/blob';
 import { generateButlerAssessment } from '../src/logic/butler';
 
@@ -12,9 +11,9 @@ interface AISummary {
  * Manual test endpoint to generate AI summary for current gameweek
  * Only works in development or when manually triggered
  */
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export default async function handler(req: Request): Promise<Response> {
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405, headers: { 'Content-Type': 'application/json' } });
   }
 
   try {
@@ -94,20 +93,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     console.log(`[AI Test] Generated and stored AI summary for GW ${currentGW}: "${aiSummary.substring(0, 50)}..."`);
     
-    return res.status(200).json({
-      success: true,
-      gameweek: currentGW,
-      summary: aiSummary,
-      generatedAt,
-      message: 'AI summary generated and stored successfully'
-    });
+    return new Response(JSON.stringify({ success: true, gameweek: currentGW, summary: aiSummary, generatedAt, message: 'AI summary generated and stored successfully' }), { status: 200, headers: { 'Content-Type': 'application/json' } });
     
   } catch (error) {
     console.error('[AI Test] Error generating AI summary:', error);
-    return res.status(500).json({
-      success: false,
-      error: 'Failed to generate AI summary',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    });
+    return new Response(JSON.stringify({ success: false, error: 'Failed to generate AI summary', message: error instanceof Error ? error.message : 'Unknown error' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
   }
 }

@@ -1,19 +1,25 @@
-import { VercelRequest, VercelResponse } from '@vercel/node';
-
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export default async function handler(req: Request): Promise<Response> {
   if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+      status: 405,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 
-  const { entryId, gameweek } = req.query;
+  const urlObj = new URL(req.url);
+  const segments = urlObj.pathname.split('/');
+  const entryId = segments[3];
+  const gameweek = segments[5];
 
-  if (!entryId || !gameweek || Array.isArray(entryId) || Array.isArray(gameweek)) {
-    return res.status(400).json({ error: 'Invalid entry ID or gameweek' });
+  if (!entryId || !gameweek) {
+    return new Response(JSON.stringify({ error: 'Invalid entry ID or gameweek' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 
   try {
     console.log(`[API] Fetching entry ${entryId} picks for gameweek ${gameweek}...`);
-    
     const url = `https://fantasy.premierleague.com/api/entry/${entryId}/event/${gameweek}/picks/`;
     const response = await fetch(url, {
       headers: {
@@ -26,35 +32,38 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (!response.ok) {
       console.error(`[API] Entry ${entryId} picks GW${gameweek} failed:`, response.status, response.statusText);
-      return res.status(response.status).json({ 
-        error: `FPL API returned ${response.status}`,
-        url 
+      return new Response(JSON.stringify({ error: `FPL API returned ${response.status}`, url }), {
+        status: response.status,
+        headers: { 'Content-Type': 'application/json' }
       });
     }
 
     const contentType = response.headers.get('content-type') || '';
     if (!contentType.includes('application/json')) {
       console.error(`[API] Entry ${entryId} picks GW${gameweek} non-JSON response:`, contentType);
-      return res.status(500).json({ 
-        error: 'Expected JSON response from FPL API',
-        contentType 
+      return new Response(JSON.stringify({ error: 'Expected JSON response from FPL API', contentType }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' }
       });
     }
 
     const data = await response.json();
-    
-    // Set cache headers
-    res.setHeader('Content-Type', 'application/json');
-    res.setHeader('Cache-Control', 's-maxage=120, stale-while-revalidate=300');
-    
     console.log(`[API] Entry ${entryId} picks GW${gameweek} success`);
-    return res.status(200).json(data);
-
+    return new Response(JSON.stringify(data), {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 's-maxage=120, stale-while-revalidate=300'
+      }
+    });
   } catch (error) {
     console.error(`[API] Entry ${entryId} picks GW${gameweek} error:`, error);
-    return res.status(500).json({ 
+    return new Response(JSON.stringify({
       error: 'Failed to fetch from FPL API',
       message: error instanceof Error ? error.message : 'Unknown error'
+    }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
     });
   }
 }
