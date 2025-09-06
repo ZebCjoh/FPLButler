@@ -15,11 +15,23 @@ export default async function handler(req: Request): Promise<Response> {
       });
     }
     if (req.method === 'POST') {
+      const token = (process.env as any).BLOB_READ_WRITE_TOKEN;
+      if (!token) {
+        return new Response(JSON.stringify({
+          error: 'Missing BLOB_READ_WRITE_TOKEN environment variable'
+        }), {
+          status: 500,
+          headers: {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*'
+          }
+        });
+      }
       // Lagre en test-summary i blob
       const { url } = await put('ai-summary.json', JSON.stringify({
         gameweek: 3,
         summary: "Dette er en testoppsummering fra backend. Skal være identisk på alle refresh."
-      }), { access: 'public', contentType: 'application/json' });
+      }), { access: 'public', contentType: 'application/json', token, addRandomSuffix: false });
       return new Response(JSON.stringify({ success: true, url }), {
         status: 200,
         headers: {
