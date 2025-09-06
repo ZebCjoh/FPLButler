@@ -1,4 +1,4 @@
-import { put } from '@vercel/blob';
+import { put, list } from '@vercel/blob';
 
 export default async function handler(req: Request): Promise<Response> {
   try {
@@ -42,13 +42,38 @@ export default async function handler(req: Request): Promise<Response> {
     }
 
     if (req.method === 'GET') {
-      // Hent direkte fra offentlig Blob-URL for å unngå Edge-avhengigheter
-      const defaultUrl = 'https://fpl-butler-blob.public.blob.vercel-storage.com/ai-summary.json';
-      const blobUrl = (process.env as any).BLOB_PUBLIC_AI_SUMMARY_URL || defaultUrl;
+      // Finn faktisk offentlig URL via Blob API + token, ellers bruk evt. env-url
+      const token = (process.env as any).BLOB_READ_WRITE_TOKEN;
+      const publicUrlFromEnv = (process.env as any).BLOB_PUBLIC_AI_SUMMARY_URL as string | undefined;
+      let resolvedUrl: string | undefined = undefined;
+
       try {
+        if (token) {
+          const { blobs } = await list({ token });
+          const match = blobs.find((b: any) => b.pathname === 'ai-summary.json');
+          if (match?.url) resolvedUrl = match.url as string;
+        }
+        if (!resolvedUrl && publicUrlFromEnv) {
+          resolvedUrl = publicUrlFromEnv;
+        }
+
+        if (!resolvedUrl) {
+          return new Response(JSON.stringify({
+            ok: false,
+            error: 'No summary found yet',
+            summary: '🍷 Ingen oppsummering tilgjengelig ennå. Kom tilbake senere.'
+          }), {
+            status: 200,
+            headers: {
+              'Content-Type': 'application/json',
+              'Access-Control-Allow-Origin': '*'
+            }
+          });
+        }
+
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 5000);
-        const resp = await fetch(blobUrl, { cache: 'no-store', signal: controller.signal });
+        const resp = await fetch(resolvedUrl, { cache: 'no-store', signal: controller.signal });
         clearTimeout(timeout);
 
         if (!resp.ok) {
