@@ -1,41 +1,33 @@
-export const config = {
-  runtime: 'edge'
-};
+import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { put } from '@vercel/blob';
 
-export default async function handler(req: Request): Promise<Response> {
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== 'POST') {
+    res.setHeader('Allow', ['POST']);
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
   try {
-    if (req.method !== 'POST') {
-      return new Response(JSON.stringify({ error: 'Method not allowed' }), {
-        status: 405,
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*'
-        }
-      });
+    const token = process.env.BLOB_READ_WRITE_TOKEN;
+    if (!token) {
+      return res.status(500).json({ error: 'Missing BLOB_READ_WRITE_TOKEN' });
     }
 
-    // Deleger til /api/ai-summary (POST) for å opprette testfil i Blob
-    const origin = new URL(req.url).origin;
-    const resp = await fetch(`${origin}/api/ai-summary`, { method: 'POST' });
-    const text = await resp.text();
-    return new Response(text, {
-      status: resp.status,
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*'
-      }
+    const now = new Date().toISOString();
+    const { url } = await put('ai-summary.json', JSON.stringify({
+      gameweek: 0,
+      summary: `Dette er en testoppsummering generert ${now}.`,
+      generatedAt: now
+    }, null, 2), {
+      access: 'public',
+      contentType: 'application/json',
+      token,
+      addRandomSuffix: false
     });
 
+    return res.status(200).json({ ok: true, url });
   } catch (error: any) {
-    console.error('Error creating test AI summary:', error);
-    return new Response(JSON.stringify({
-      error: error.message || 'Server error'
-    }), {
-      status: 500,
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*'
-      }
-    });
+    console.error('[test-ai-summary] Error:', error);
+    return res.status(500).json({ ok: false, error: error?.message || 'Unknown error' });
   }
 }
