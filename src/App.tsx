@@ -13,6 +13,7 @@ export const App = () => {
   });
   const [error, setError] = useState<string | null>(null);
   const [butlerAssessment, setButlerAssessment] = useState<string>('');
+  const [historyData, setHistoryData] = useState<any[]>([]);
 
   // Dynamiske høydepunkter kommer fra metrics.getHighlights i weeklyStats.highlights
 
@@ -433,6 +434,19 @@ export const App = () => {
         console.debug('[Weekly] form counts -> hot:', weekly.formTable.hotStreak.length, 'cold:', weekly.formTable.coldStreak.length);
         setWeeklyStats(weekly);
         setLoadingStates(prev => ({ ...prev, liveData: false }));
+        
+        // 5) Fetch history data for dropdown
+        try {
+          console.log('[App] Fetching history data...');
+          const historyResponse = await fetch('/api/history');
+          if (historyResponse.ok) {
+            const history = await historyResponse.json();
+            setHistoryData(history);
+            console.log('[App] History data loaded:', history.length, 'items');
+          }
+        } catch (historyError) {
+          console.warn('[App] Failed to fetch history data:', historyError);
+        }
         
         // AI Summary is now fetched earlier in parallel
         setError(null);
@@ -957,6 +971,38 @@ export const App = () => {
                   </div>
                   <p className="text-white/80 text-xs">
                     Dataene hentes direkte fra Fantasy Premier League API i sanntid.
+                  </p>
+                </div>
+              </section>
+
+              {/* History Dropdown */}
+              <section className="mt-8">
+                <div className="bg-[#3D195B] border-2 border-[#00E0D3]/60 rounded-xl p-4">
+                  <div className="flex items-center justify-center gap-2 mb-3">
+                    <span className="text-lg">📚</span>
+                    <h3 className="text-base font-bold text-white">Gameweek Historikk</h3>
+                  </div>
+                  <div className="flex justify-center">
+                    <select 
+                      className="bg-purple-800 text-white rounded-lg px-4 py-2 border-2 border-[#00E0D3]/60 hover:border-[#00E0D3] transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-[#00E0D3] cursor-pointer min-w-[250px]"
+                      defaultValue=""
+                      onChange={(e) => {
+                        if (e.target.value) {
+                          // Simple navigation - in a real React Router setup, you'd use useNavigate()
+                          window.location.href = e.target.value;
+                        }
+                      }}
+                    >
+                      <option value="" disabled>Velg Gameweek</option>
+                      {historyData.map((item) => (
+                        <option key={item.id} value={item.url} className="bg-purple-800 text-white">
+                          {item.title}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <p className="text-white/70 text-xs text-center mt-2">
+                    Se tidligere gameweeks og resultater
                   </p>
                 </div>
               </section>
