@@ -26,8 +26,7 @@ const fetchFPL = async <T>(url: string): Promise<T> => {
 export async function generateComprehensiveWeeklyStats(gameweek: number): Promise<any> {
   console.log(`[summaryGenerator] Starting comprehensive stat generation for GW ${gameweek}`);
 
-  // 1. Fetch bootstrap and league data
-  const bootstrapData: any = await fetchFPL<any>('https://fantasy.premierleague.com/api/bootstrap-static/');
+  // 1. Fetch league and live data
   const leagueData: any = await fetchFPL<any>(`https://fantasy.premierleague.com/api/leagues-classic/${FPL_LEAGUE_ID}/standings/`);
   const liveData: any = await fetchFPL<any>(`https://fantasy.premierleague.com/api/event/${gameweek}/live/`);
 
