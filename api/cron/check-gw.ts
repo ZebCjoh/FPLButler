@@ -124,8 +124,8 @@ function generateComparisonStructure(weeklyStats: any, pick: any, seed: string):
 }
 
 function generateThematicStructure(weeklyStats: any, pick: any, seed: string): string {
-  const { weekWinner, weekLoser, benchWarmer } = weeklyStats;
-  const riser = weeklyStats.movements?.riser; const faller = weeklyStats.movements?.faller;
+  const { weekWinner, weekLoser } = weeklyStats;
+  // const riser = weeklyStats.movements?.riser; const faller = weeklyStats.movements?.faller;
   
   const themes = ['Kaos','Stabilitet','Overraskelser','Konsistens','Kontraster','Ironi','Forutsigbarhet'];
   const selectedTheme = pick(themes, seed + '|theme');
