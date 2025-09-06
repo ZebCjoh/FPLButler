@@ -1,19 +1,14 @@
-export default async function handler(req: Request): Promise<Response> {
+import type { VercelRequest, VercelResponse } from '@vercel/node';
+
+export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') {
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
-      status: 405,
-      headers: { 'Content-Type': 'application/json' }
-    });
+    return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const url = new URL(req.url);
-  const leagueId = url.pathname.split('/')[2]; // Extract leagueId from path
+  const { leagueId } = req.query;
 
-  if (!leagueId) {
-    return new Response(JSON.stringify({ error: 'Invalid league ID' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' }
-    });
+  if (!leagueId || typeof leagueId !== 'string') {
+    return res.status(400).json({ error: 'Invalid league ID' });
   }
 
   try {
@@ -31,46 +26,32 @@ export default async function handler(req: Request): Promise<Response> {
 
     if (!response.ok) {
       console.error(`[API] League ${leagueId} failed:`, response.status, response.statusText);
-      return new Response(JSON.stringify({ 
+      return res.status(response.status).json({ 
         error: `FPL API returned ${response.status}`,
         url: apiUrl
-      }), {
-        status: response.status,
-        headers: { 'Content-Type': 'application/json' }
       });
     }
 
     const contentType = response.headers.get('content-type') || '';
     if (!contentType.includes('application/json')) {
       console.error(`[API] League ${leagueId} non-JSON response:`, contentType);
-      return new Response(JSON.stringify({ 
+      return res.status(500).json({ 
         error: 'Expected JSON response from FPL API',
         contentType 
-      }), {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' }
       });
     }
 
     const data = await response.json();
     
     console.log(`[API] League ${leagueId} success`);
-    return new Response(JSON.stringify(data), {
-      status: 200,
-      headers: { 
-        'Content-Type': 'application/json',
-        'Cache-Control': 's-maxage=60, stale-while-revalidate=300'
-      }
-    });
+    res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=300');
+    return res.status(200).json(data);
 
   } catch (error) {
     console.error(`[API] League ${leagueId} error:`, error);
-    return new Response(JSON.stringify({ 
+    return res.status(500).json({ 
       error: 'Failed to fetch from FPL API',
       message: error instanceof Error ? error.message : 'Unknown error'
-    }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
     });
   }
 }

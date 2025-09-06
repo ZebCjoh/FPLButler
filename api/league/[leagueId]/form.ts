@@ -1,3 +1,4 @@
+import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 interface BootstrapEvent {
   id: number;
@@ -81,23 +82,20 @@ async function safeJson(url: string): Promise<any> {
   return response.json();
 }
 
-export default async function handler(req: Request): Promise<Response> {
+export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') {
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405, headers: { 'Content-Type': 'application/json' } });
+    return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const urlObj = new URL(req.url);
-  const segments = urlObj.pathname.split('/');
-  const leagueId = segments[3];
-  const windowParam = urlObj.searchParams.get('window');
+  const { leagueId, window: windowParam } = req.query;
   const window = windowParam ? parseInt(String(windowParam)) : 3;
 
-  if (!leagueId) {
-    return new Response(JSON.stringify({ error: 'Invalid league ID' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+  if (!leagueId || typeof leagueId !== 'string') {
+    return res.status(400).json({ error: 'Invalid league ID' });
   }
 
   if (isNaN(window) || window < 1 || window > 10) {
-    return new Response(JSON.stringify({ error: 'Window must be between 1 and 10' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+    return res.status(400).json({ error: 'Window must be between 1 and 10' });
   }
 
   try {
@@ -122,7 +120,7 @@ export default async function handler(req: Request): Promise<Response> {
     const standings: LeagueStandings = await safeJson(`https://fantasy.premierleague.com/api/leagues-classic/${leagueId}/standings/`);
     
     if (!standings.results || standings.results.length === 0) {
-      return new Response(JSON.stringify({ error: 'No entries found in league' }), { status: 404, headers: { 'Content-Type': 'application/json' } });
+      return res.status(404).json({ error: 'No entries found in league' });
     }
 
     // Step 3: Calculate actual window based on current GW
@@ -187,10 +185,11 @@ export default async function handler(req: Request): Promise<Response> {
     };
 
     console.log(`[API] Form calculation complete for league ${leagueId}`);
-    return new Response(JSON.stringify(response), { status: 200, headers: { 'Content-Type': 'application/json', 'Cache-Control': 's-maxage=300, stale-while-revalidate=60' } });
+    res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=60');
+    return res.status(200).json(response);
 
   } catch (error) {
     console.error(`[API] Form calculation error for league ${leagueId}:`, error);
-    return new Response(JSON.stringify({ error: 'Failed to calculate form', message: error instanceof Error ? error.message : 'Unknown error' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+    return res.status(500).json({ error: 'Failed to calculate form', message: error instanceof Error ? error.message : 'Unknown error' });
   }
 }
