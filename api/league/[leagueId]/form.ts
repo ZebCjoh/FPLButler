@@ -117,9 +117,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // Step 2: Get league standings
-    const standings: LeagueStandings = await safeJson(`https://fantasy.premierleague.com/api/leagues-classic/${leagueId}/standings/`);
+    const standingsResponse = await safeJson(`https://fantasy.premierleague.com/api/leagues-classic/${leagueId}/standings/`);
     
-    if (!standings.results || standings.results.length === 0) {
+    console.log(`[API] Standings response structure:`, Object.keys(standingsResponse));
+    
+    // Handle both direct results and nested standings structure
+    const standings = standingsResponse.standings || standingsResponse;
+    const results = standings.results || [];
+    
+    if (!results || results.length === 0) {
+      console.log(`[API] No results found. Response keys:`, Object.keys(standingsResponse));
       return res.status(404).json({ error: 'No entries found in league' });
     }
 
@@ -137,7 +144,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Step 4: Get form data for each entry
     const formEntries: FormEntry[] = await processInBatches(
-      standings.results,
+      results,
       async (entry: LeagueEntry): Promise<FormEntry> => {
         try {
           const history: HistoryData = await safeJson(`https://fantasy.premierleague.com/api/entry/${entry.entry}/history/`);
