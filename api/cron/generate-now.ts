@@ -238,6 +238,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       addRandomSuffix: false
     });
 
+    // Also save to history via internal API call
+    try {
+      const baseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://fpl-butler.vercel.app';
+      const historyResponse = await fetch(`${baseUrl}/api/ai-summary`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          gameweek: gw,
+          summary: summary
+        })
+      });
+      
+      if (historyResponse.ok) {
+        console.log(`[generate-now] Saved GW ${gw} to history successfully`);
+      } else {
+        console.warn(`[generate-now] Failed to save to history: ${historyResponse.status}`);
+      }
+    } catch (historyError) {
+      console.warn(`[generate-now] History save error:`, historyError);
+    }
+
     return res.status(200).json({ ok: true, gameweek: gw, url });
   } catch (error: any) {
     console.error('[generate-now] Error:', error);
