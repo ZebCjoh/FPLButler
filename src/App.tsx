@@ -3,7 +3,7 @@ import { getHighlights } from './logic/metrics';
 
 export const App = () => {
   const [standings, setStandings] = useState<any[]>([]);
-  const [currentGameweek, setCurrentGameweek] = useState<number>(1);
+  const [currentGameweek, setCurrentGameweek] = useState<number | null>(null);
   const [weeklyStats, setWeeklyStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -422,8 +422,8 @@ export const App = () => {
           </div>
           <div className="text-white">
             <p className="text-lg font-light mb-1">Ukentlig oppsummering</p>
-            <p className="text-base font-medium mb-1">Liga: {standings[0]?.league_name || 'Bekk Liga'}</p>
-            <p className="text-base font-medium">Gameweek {currentGameweek}</p>
+            <p className="text-base font-medium mb-1">Liga: {standings[0]?.league_name || 'Laster liga...'}</p>
+            <p className="text-base font-medium">Gameweek {currentGameweek || '–'}</p>
           </div>
         </header>
 
@@ -617,7 +617,7 @@ export const App = () => {
                     <h2 className="text-2xl md:text-3xl font-bold text-white mb-2">
                       📊 Ukestatistikk
                     </h2>
-                    <p className="text-white/80 text-sm">Gameweek {currentGameweek} høydepunkter</p>
+                    <p className="text-white/80 text-sm">Gameweek {currentGameweek || '–'} høydepunkter</p>
                   </div>
                   
                   {/* 2-Column Grid for Compact Stats */}
