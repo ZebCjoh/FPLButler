@@ -299,7 +299,8 @@ export async function runCheck() {
       }));
 
       // Get form data
-      const formResponse = await fetch(`${process.env.VERCEL_URL || 'http://localhost:3000'}/api/league/${FPL_LEAGUE_ID}/form?window=3`, {
+      const baseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://fpl-butler.vercel.app';
+      const formResponse = await fetch(`${baseUrl}/api/league/${FPL_LEAGUE_ID}/form?window=3`, {
         headers: { 'User-Agent': 'Mozilla/5.0 (compatible; FPL-Butler/1.0)' }
       });
       const formData = formResponse.ok ? await formResponse.json() : { hot: [], cold: [] };
