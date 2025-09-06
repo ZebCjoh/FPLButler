@@ -5,17 +5,54 @@ export const App = () => {
   const [standings, setStandings] = useState<any[]>([]);
   const [currentGameweek, setCurrentGameweek] = useState<number | null>(null);
   const [weeklyStats, setWeeklyStats] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const [loadingStates, setLoadingStates] = useState({
+    bootstrap: true,
+    standings: true,
+    liveData: true,
+    aiSummary: true
+  });
   const [error, setError] = useState<string | null>(null);
   const [butlerAssessment, setButlerAssessment] = useState<string>('');
 
   // Dynamiske høydepunkter kommer fra metrics.getHighlights i weeklyStats.highlights
 
+  // Load cached data immediately on mount
+  useEffect(() => {
+    const loadCachedData = () => {
+      try {
+        const cachedStandings = localStorage.getItem('fpl-standings');
+        const cachedGameweek = localStorage.getItem('fpl-gameweek');
+        const cachedButlerAssessment = localStorage.getItem('ai-summary-current');
+        
+        if (cachedStandings) {
+          console.log('[App] Loading cached standings');
+          setStandings(JSON.parse(cachedStandings));
+          setLoadingStates(prev => ({ ...prev, standings: false }));
+        }
+        
+        if (cachedGameweek) {
+          console.log('[App] Loading cached gameweek');
+          setCurrentGameweek(JSON.parse(cachedGameweek));
+          setLoadingStates(prev => ({ ...prev, bootstrap: false }));
+        }
+        
+        if (cachedButlerAssessment) {
+          console.log('[App] Loading cached AI summary');
+          const cached = JSON.parse(cachedButlerAssessment);
+          setButlerAssessment(cached.summary || '');
+          setLoadingStates(prev => ({ ...prev, aiSummary: false }));
+        }
+      } catch (e) {
+        console.warn('[App] Failed to load cached data:', e);
+      }
+    };
+    
+    loadCachedData();
+  }, []);
+
   useEffect(() => {
     const fetchAllData = async () => {
       try {
-        setLoading(true);
-
         // 1) Bootstrap for metadata (players, events, next deadline, current gw)
         console.log('[App] Fetching bootstrap data...');
         const bootstrapResponse = await fetch('/api/bootstrap-static');
@@ -31,6 +68,8 @@ export const App = () => {
         });
         const currentGW = bootstrapData.events.find((event: any) => event.is_current)?.id || 1;
         setCurrentGameweek(currentGW);
+        localStorage.setItem('fpl-gameweek', JSON.stringify(currentGW));
+        setLoadingStates(prev => ({ ...prev, bootstrap: false }));
 
         // 2) League standings
         console.log('[App] Fetching league standings...');
@@ -47,6 +86,8 @@ export const App = () => {
           league_name: standingsData.league.name
         }));
         setStandings(leagueEntriesWithLeagueWithLeague);
+        localStorage.setItem('fpl-standings', JSON.stringify(leagueEntriesWithLeagueWithLeague));
+        setLoadingStates(prev => ({ ...prev, standings: false }));
 
         // 3) Live GW data for player points map
         console.log('[App] Fetching live gameweek data...');
@@ -344,6 +385,7 @@ export const App = () => {
 
         console.debug('[Weekly] form counts -> hot:', weekly.formTable.hotStreak.length, 'cold:', weekly.formTable.coldStreak.length);
         setWeeklyStats(weekly);
+        setLoadingStates(prev => ({ ...prev, liveData: false }));
         
         // Butler's Assessment: Always fetch from backend (Vercel Blob via cron system)
         try {
@@ -356,6 +398,8 @@ export const App = () => {
             const summaryText = aiData.summary || '';
             console.log('[App] Loaded AI summary payload:', aiData);
             setButlerAssessment(summaryText);
+            // Cache the AI summary locally for instant loading next time
+            localStorage.setItem('ai-summary-current', JSON.stringify(aiData));
           } else if (aiResponse.status === 404) {
             // No cached summary available yet
             console.log('[App] No AI summary available in backend yet');
@@ -368,12 +412,11 @@ export const App = () => {
           // Last resort: use static fallback message
           setButlerAssessment("Butleren er for opptatt med å observere kompetente mennesker til å kommentere akkurat nå.");
         }
+        setLoadingStates(prev => ({ ...prev, aiSummary: false }));
         setError(null);
     } catch (err) {
         console.error('Error fetching data:', err);
         setError('Kunne ikke hente ligadata. Prøv å refreshe siden.');
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -427,13 +470,7 @@ export const App = () => {
           </div>
         </header>
 
-        {/* Loading State */}
-        {loading && (
-          <div className="text-center py-12">
-            <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-[#00E0D3]"></div>
-            <p className="mt-4 text-lg text-white">Henter ligadata...</p>
-          </div>
-        )}
+        {/* Show static UI immediately - no more blocking loading state */}
 
         {/* Error State */}
         {error && (
@@ -445,7 +482,7 @@ export const App = () => {
         )}
 
         {/* Butler's Assessment Section */}
-        {!loading && !error && butlerAssessment && (
+        {!error && (
           <section className="mb-8">
             <div className="bg-[#3D195B] border-2 border-[#00E0D3]/60 rounded-2xl p-6 max-w-4xl mx-auto">
               <div className="flex items-center gap-3 mb-4">
@@ -455,16 +492,23 @@ export const App = () => {
                 <h3 className="text-xl font-bold text-white">Butlerens vurdering</h3>
               </div>
               <div className="bg-[#00E0D3]/10 rounded-lg p-4">
-                <p className="text-white leading-relaxed text-sm">
-                  {butlerAssessment}
-                </p>
+                {loadingStates.aiSummary ? (
+                  <div className="flex items-center gap-2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-[#00E0D3]"></div>
+                    <p className="text-white/70 text-sm italic">Butleren forbereder sin vurdering...</p>
+                  </div>
+                ) : (
+                  <p className="text-white leading-relaxed text-sm">
+                    {butlerAssessment || "Butleren vurderer dagens prestasjoner..."}
+                  </p>
+                )}
               </div>
             </div>
           </section>
         )}
 
         {/* Main Content - 2 Column Layout */}
-        {!loading && !error && (
+        {!error && (
           <main className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {/* Left Column */}
             <div className="space-y-8">
@@ -477,8 +521,21 @@ export const App = () => {
                   <p className="text-white/80 text-sm">De beste lagene i ligaen</p>
                 </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {topThree.map(({ rank, teamName, manager, points }) => (
+                {loadingStates.standings ? (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {[1, 2, 3].map(i => (
+                      <div key={i} className="bg-[#3D195B] border-2 border-[#00E0D3]/60 rounded-2xl p-4">
+                        <div className="text-center space-y-3">
+                          <div className="w-12 h-12 mx-auto bg-gray-600 rounded-full animate-pulse"></div>
+                          <div className="h-4 bg-gray-600 rounded animate-pulse"></div>
+                          <div className="h-3 bg-gray-600 rounded w-2/3 mx-auto animate-pulse"></div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {topThree.map(({ rank, teamName, manager, points }) => (
                     <div
                       key={rank}
                       className={`
@@ -525,8 +582,9 @@ export const App = () => {
                         </div>
                       </div>
                     </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </section>
 
               {/* Compact Bottom 3 Section */}
@@ -611,7 +669,27 @@ export const App = () => {
 
             {/* Right Column - Weekly Stats */}
             <div className="space-y-4">
-              {weeklyStats && (
+              {loadingStates.liveData ? (
+                <section>
+                  <div className="text-center mb-4">
+                    <h2 className="text-2xl md:text-3xl font-bold text-white mb-2">
+                      📊 Ukestatistikk
+                    </h2>
+                    <p className="text-white/80 text-sm">Gameweek {currentGameweek || '–'} høydepunkter</p>
+                  </div>
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 mb-4">
+                    {[...Array(6)].map((_, i) => (
+                      <div key={i} className="bg-[#3D195B] border-2 border-[#00E0D3]/60 rounded-2xl p-4">
+                        <div className="space-y-3">
+                          <div className="h-5 bg-gray-600 rounded w-3/4 animate-pulse"></div>
+                          <div className="h-4 bg-gray-600 rounded w-1/2 animate-pulse"></div>
+                          <div className="h-3 bg-gray-600 rounded w-full animate-pulse"></div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              ) : weeklyStats && (
                 <section>
                   <div className="text-center mb-4">
                     <h2 className="text-2xl md:text-3xl font-bold text-white mb-2">
