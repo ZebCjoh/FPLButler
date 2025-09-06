@@ -34,8 +34,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (req.method === 'GET') {
-      const { blobs } = await list({ token });
-      const stateBlob = blobs.find((b: any) => b.pathname === 'ai-summary.json');
+      const { blobs } = await list({ token, prefix: 'ai-summary.json' as any });
+      const candidates = (blobs || []).filter((b: any) => b.pathname === 'ai-summary.json');
+      const stateBlob = candidates.sort((a: any, b: any) => {
+        const atA = new Date(a.uploadedAt || a.createdAt || 0).getTime();
+        const atB = new Date(b.uploadedAt || b.createdAt || 0).getTime();
+        return atB - atA;
+      })[0];
       if (!stateBlob) {
         return res.status(200).json({
           ok: false,

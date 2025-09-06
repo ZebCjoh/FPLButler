@@ -348,13 +348,13 @@ export const App = () => {
         // Butler's Assessment: Always fetch from backend (Vercel Blob via cron system)
         try {
           console.log('[App] Fetching AI summary from backend...');
-          
-          const aiResponse = await fetch('/api/ai-summary');
+          // Bypass any browser cache to always read the latest stored summary
+          const aiResponse = await fetch(`/api/ai-summary?ts=${Date.now()}`, { cache: 'no-store' });
           
           if (aiResponse.ok) {
             const aiData = await aiResponse.json();
             const summaryText = aiData.summary || '';
-            console.log(`[App] Loaded AI summary for GW ${aiData.gameweek} from backend`);
+            console.log('[App] Loaded AI summary payload:', aiData);
             setButlerAssessment(summaryText);
           } else if (aiResponse.status === 404) {
             // No cached summary available yet
