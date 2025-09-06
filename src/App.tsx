@@ -71,7 +71,35 @@ export const App = () => {
         localStorage.setItem('fpl-gameweek', JSON.stringify(currentGW));
         setLoadingStates(prev => ({ ...prev, bootstrap: false }));
 
-        // 2) League standings
+        // 2) Butler's Assessment: Fetch early since it's displayed at the top
+        const fetchAISummary = async () => {
+          try {
+            console.log('[App] Fetching AI summary from backend...');
+            const aiResponse = await fetch(`/api/ai-summary?ts=${Date.now()}`, { cache: 'no-store' });
+            
+            if (aiResponse.ok) {
+              const aiData = await aiResponse.json();
+              const summaryText = aiData.summary || '';
+              console.log('[App] Loaded AI summary payload:', aiData);
+              setButlerAssessment(summaryText);
+              localStorage.setItem('ai-summary-current', JSON.stringify(aiData));
+            } else if (aiResponse.status === 404) {
+              console.log('[App] No AI summary available in backend yet');
+              setButlerAssessment("Butleren forbereder en vurdering av ukens prestasjoner. Vennligst vent mens han observerer kompetansen.");
+            } else {
+              throw new Error(`AI summary API failed: ${aiResponse.status}`);
+            }
+          } catch (aiError) {
+            console.warn('[App] Failed to fetch AI summary from backend:', aiError);
+            setButlerAssessment("Butleren er for opptatt med å observere kompetente mennesker til å kommentere akkurat nå.");
+          }
+          setLoadingStates(prev => ({ ...prev, aiSummary: false }));
+        };
+
+        // Start AI summary fetch in parallel (non-blocking)
+        fetchAISummary();
+
+        // 3) League standings
         console.log('[App] Fetching league standings...');
         const standingsResponse = await fetch('/api/league/155099');
         if (!standingsResponse.ok) {
@@ -387,32 +415,7 @@ export const App = () => {
         setWeeklyStats(weekly);
         setLoadingStates(prev => ({ ...prev, liveData: false }));
         
-        // Butler's Assessment: Always fetch from backend (Vercel Blob via cron system)
-        try {
-          console.log('[App] Fetching AI summary from backend...');
-          // Bypass any browser cache to always read the latest stored summary
-          const aiResponse = await fetch(`/api/ai-summary?ts=${Date.now()}`, { cache: 'no-store' });
-          
-          if (aiResponse.ok) {
-            const aiData = await aiResponse.json();
-            const summaryText = aiData.summary || '';
-            console.log('[App] Loaded AI summary payload:', aiData);
-            setButlerAssessment(summaryText);
-            // Cache the AI summary locally for instant loading next time
-            localStorage.setItem('ai-summary-current', JSON.stringify(aiData));
-          } else if (aiResponse.status === 404) {
-            // No cached summary available yet
-            console.log('[App] No AI summary available in backend yet');
-            setButlerAssessment("Butleren forbereder en vurdering av ukens prestasjoner. Vennligst vent mens han observerer kompetansen.");
-          } else {
-            throw new Error(`AI summary API failed: ${aiResponse.status}`);
-          }
-        } catch (aiError) {
-          console.warn('[App] Failed to fetch AI summary from backend:', aiError);
-          // Last resort: use static fallback message
-          setButlerAssessment("Butleren er for opptatt med å observere kompetente mennesker til å kommentere akkurat nå.");
-        }
-        setLoadingStates(prev => ({ ...prev, aiSummary: false }));
+        // AI Summary is now fetched earlier in parallel
         setError(null);
     } catch (err) {
         console.error('Error fetching data:', err);
