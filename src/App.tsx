@@ -382,12 +382,31 @@ export const App = () => {
             .map(([entryId, bench]) => {
               const row = leagueEntriesWithLeague.find((r: any) => r.entry === Number(entryId));
               return { 
+                entryId: Number(entryId),
                 teamName: row?.entry_name || 'Ukjent', 
                 manager: row?.player_name || 'Ukjent',
                 benchPoints: bench as number 
               };
             })
-            .sort((a: any, b: any) => (b.benchPoints as number) - (a.benchPoints as number))[0],
+            .sort((a: any, b: any) => {
+              // Primary sort: bench points (descending)
+              const pointsDiff = (b.benchPoints as number) - (a.benchPoints as number);
+              if (pointsDiff !== 0) return pointsDiff;
+              
+              // Tie-breaker: entry ID (ascending for consistency)
+              return (a.entryId as number) - (b.entryId as number);
+            })
+            .filter((entry, index) => {
+              // Debug logging
+              console.debug(`[Bench] ${index + 1}. ${entry.manager}: ${entry.benchPoints}p (ID: ${entry.entryId})`);
+              return true;
+            })
+            .map((entry, index) => {
+              if (index === 0) {
+                console.log(`[Bench] Winner: ${entry.manager} with ${entry.benchPoints}p`);
+              }
+              return entry;
+            })[0],
           chipsUsed: chipUses,
           movements: {
             riser: { teamName: riser?.teamName || '-', manager: riser?.manager || '-', change: Math.max(0, riser?.change || 0) },
