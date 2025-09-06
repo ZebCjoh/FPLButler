@@ -275,6 +275,28 @@ export async function runCheck() {
         token: process.env.BLOB_READ_WRITE_TOKEN
       });
 
+      // Also save to history via internal API call
+      try {
+        const response = await fetch(`${process.env.VERCEL_URL || 'http://localhost:3000'}/api/ai-summary`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            gameweek: currentGw,
+            summary: aiSummary
+          })
+        });
+        
+        if (response.ok) {
+          console.log(`[Cron] Saved GW ${currentGw} to history successfully`);
+        } else {
+          console.warn(`[Cron] Failed to save to history: ${response.status}`);
+        }
+      } catch (historyError) {
+        console.warn(`[Cron] History save error:`, historyError);
+      }
+
       console.log(`[Cron] Stored AI summary for GW ${currentGw}: "${aiSummary.substring(0, 50)}..."`);
 
       // 6. Update processed state in Blob

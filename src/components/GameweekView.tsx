@@ -1,19 +1,58 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 
 interface GameweekViewProps {
   gameweekId: string;
   onBackToHome: () => void;
 }
 
-const GameweekView: React.FC<GameweekViewProps> = ({ gameweekId, onBackToHome }) => {
-  // Dummy data for testing - will be replaced with API calls later
-  const historyData: Record<string, string> = {
-    '1': 'Saints go Martin in tok ledelsen med 72 poeng. Erik Knutsen hadde en solid start med kapteinsvalget Haaland som ga 24 poeng. Flere spillere satset på Salah, men det ga ikke like mye uttelling denne runden.',
-    '2': 'Løv-Ham raknet helt med bare 32 poeng denne runden. Marius Dramstad klatret til 2. plass etter en fantastisk runde med 65 poeng. Wildcard ble aktivert av 3 managere, men ingen av dem klarte å utnytte det optimalt.',
-    '3': 'Erik Knutsen dominerer med 60 poeng og tar over førsteplassen. Sebastian Mørken hadde en skuffende runde og falt ned tabellen. Kapteinsvalget var delt mellom Haaland og Salah denne runden.'
-  };
+interface GameweekData {
+  id: number;
+  gameweek: number;
+  summary: string;
+  createdAt: string;
+}
 
-  const summaryText = historyData[gameweekId] || 'Ingen data tilgjengelig for denne gameweek.';
+const GameweekView: React.FC<GameweekViewProps> = ({ gameweekId, onBackToHome }) => {
+  const [gameweekData, setGameweekData] = useState<GameweekData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchGameweekData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        console.log(`[GameweekView] Fetching data for gameweek ${gameweekId}...`);
+        const response = await fetch(`/api/history/${gameweekId}`);
+        
+        if (!response.ok) {
+          if (response.status === 404) {
+            setError(`Ingen data tilgjengelig for Gameweek ${gameweekId}.`);
+          } else {
+            throw new Error(`API error: ${response.status}`);
+          }
+          return;
+        }
+        
+        const data: GameweekData = await response.json();
+        setGameweekData(data);
+        console.log(`[GameweekView] Loaded data for gameweek ${gameweekId}`);
+        
+      } catch (err) {
+        console.error(`[GameweekView] Error fetching gameweek ${gameweekId}:`, err);
+        setError('Kunne ikke hente data for denne gameweek. Prøv igjen senere.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (gameweekId) {
+      fetchGameweekData();
+    }
+  }, [gameweekId]);
+
+  const summaryText = gameweekData?.summary || error || 'Laster data...';
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#9B27E8] via-[#3E9BF9] to-[#00E0D3]">
@@ -51,9 +90,31 @@ const GameweekView: React.FC<GameweekViewProps> = ({ gameweekId, onBackToHome })
             </div>
 
             <div className="bg-[#2D0A2E] border border-[#00E0D3]/60 rounded-xl p-6">
-              <p className="text-white text-base leading-relaxed">
-                {summaryText}
-              </p>
+              {loading ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#00E0D3]"></div>
+                  <span className="ml-3 text-white">Laster gameweek data...</span>
+                </div>
+              ) : (
+                <div>
+                  <p className="text-white text-base leading-relaxed">
+                    {summaryText}
+                  </p>
+                  {gameweekData && (
+                    <div className="mt-4 pt-4 border-t border-[#00E0D3]/30">
+                      <p className="text-white/60 text-xs">
+                        Generert: {new Date(gameweekData.createdAt).toLocaleDateString('no-NO', {
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
