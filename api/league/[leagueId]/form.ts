@@ -14,6 +14,7 @@ interface LeagueEntry {
   entry: number;
   entry_name: string;
   player_name: string;
+  total?: number;
 }
 
 interface LeagueStandings {
@@ -147,9 +148,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       results,
       async (entry: LeagueEntry): Promise<FormEntry> => {
         try {
+          // If window covers all gameweeks so far, use league total (more accurate)
+          if (actualWindow >= currentGw) {
+            console.log(`[API] Using league total for entry ${entry.entry} (window=${actualWindow}, currentGw=${currentGw})`);
+            return {
+              entryId: entry.entry,
+              managerName: entry.player_name,
+              teamName: entry.entry_name,
+              points: entry.total || 0,
+            };
+          }
+
+          // Otherwise, sum specific gameweeks from history
           const history: HistoryData = await safeJson(`https://fantasy.premierleague.com/api/entry/${entry.entry}/history/`);
           
-          // Sum points for the gameweeks in our window
           let totalPoints = 0;
           for (const gw of gameweeksToCheck) {
             const gwData = history.current?.find(h => h.event === gw);
@@ -166,12 +178,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           };
         } catch (error) {
           console.error(`[API] Failed to get history for entry ${entry.entry}:`, error);
-          // Return entry with 0 points if we can't get history
+          // Return entry with league total as fallback
           return {
             entryId: entry.entry,
             managerName: entry.player_name,
             teamName: entry.entry_name,
-            points: 0,
+            points: entry.total || 0,
           };
         }
       },
