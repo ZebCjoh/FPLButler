@@ -1,5 +1,8 @@
 import { list, put } from '@vercel/blob';
 import { generateButlerAssessment } from '../../src/logic/butler';
+import { generateComprehensiveWeeklyStats } from '../../src/logic/summaryGenerator';
+import type { VercelRequest, VercelResponse } from '@vercel/node';
+
 
 // Types for FPL API and our storage
 interface FPLEvent {
@@ -38,79 +41,10 @@ interface CheckResult {
 }
 
 /**
- * Generate AI summary for finished gameweek by fetching FPL data
- */
-async function generateAISummaryForGW(gameweek: number): Promise<string> {
-  try {
-    console.log(`[Cron AI] Generating summary for GW ${gameweek}...`);
-    
-    // Fetch necessary FPL data for the gameweek (simplified version)
-    const [bootstrapResponse, leagueResponse] = await Promise.all([
-      fetch('https://fantasy.premierleague.com/api/bootstrap-static/', {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (compatible; FPL-Butler/1.0)',
-          'Accept': 'application/json',
-          'Referer': 'https://fantasy.premierleague.com/',
-        },
-      }),
-      fetch('https://fantasy.premierleague.com/api/leagues-classic/155099/standings/', {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (compatible; FPL-Butler/1.0)',
-          'Accept': 'application/json',
-          'Referer': 'https://fantasy.premierleague.com/',
-        },
-      })
-    ]);
-
-    if (!bootstrapResponse.ok || !leagueResponse.ok) {
-      throw new Error('Failed to fetch FPL data for AI summary');
-    }
-
-    const [, leagueData] = await Promise.all([
-      bootstrapResponse.json(),
-      leagueResponse.json()
-    ]);
-
-    // Simplified data extraction for AI generation
-    const leagueEntries = leagueData.standings?.results || [];
-    
-    // Create simplified weekly stats for AI generation
-    const weeklyStats = {
-      weekWinner: leagueEntries[0] ? {
-        manager: leagueEntries[0].player_name,
-        points: leagueEntries[0].event_total || 0
-      } : null,
-      weekLoser: leagueEntries[leagueEntries.length - 1] ? {
-        manager: leagueEntries[leagueEntries.length - 1].player_name,
-        points: leagueEntries[leagueEntries.length - 1].event_total || 0
-      } : null,
-      benchWarmer: {
-        manager: 'Unknown',
-        benchPoints: 0
-      },
-      movements: {
-        riser: { manager: 'Unknown', change: 0 },
-        faller: { manager: 'Unknown', change: 0 }
-      },
-      chipsUsed: []
-    };
-
-    // Generate AI assessment
-    const aiSummary = generateButlerAssessment({ weeklyStats });
-    console.log(`[Cron AI] Generated summary: ${aiSummary.substring(0, 100)}...`);
-    
-    return aiSummary;
-  } catch (error) {
-    console.error(`[Cron AI] Error generating AI summary for GW ${gameweek}:`, error);
-    return "Butleren er for opptatt med å observere kompetente mennesker til å kommentere denne uken.";
-  }
-}
-
-/**
  * Core logic for checking gameweek status and triggering actions
  * Separated for easy testing and reuse
  */
-export async function runCheck(): Promise<CheckResult> {
+export async function runCheck() {
   const checkedAt = new Date().toISOString();
   let currentGw: number | null = null;
   let isFinished = false;
@@ -137,29 +71,37 @@ export async function runCheck(): Promise<CheckResult> {
     
     // 2. Find current gameweek
     const currentEvent = fplData.events.find(e => e.is_current);
-    if (!currentEvent) {
-      return {
-        ok: false,
-        checkedAt,
-        currentGw: null,
-        isFinished: false,
-        lastProcessedGwBefore: 0,
-        didTrigger: false,
-        reason: 'No current gameweek found in FPL data'
-      };
+    
+    // Logic to handle the case where no GW is current (end of season)
+    // We'll check for the latest *finished* GW instead.
+    let eventToProcess: FPLEvent | undefined = currentEvent;
+    if (!eventToProcess || !eventToProcess.is_finished) {
+        const lastFinishedEvent = [...fplData.events]
+            .filter(e => e.is_finished)
+            .sort((a, b) => b.id - a.id)[0];
+        
+        if (lastFinishedEvent) {
+            console.log(`[Cron] No current finished GW. Using last finished GW: ${lastFinishedEvent.id}`);
+            eventToProcess = lastFinishedEvent;
+        } else if (currentEvent) {
+            console.log(`[Cron] Current GW ${currentEvent.id} is not finished. Nothing to process.`);
+            eventToProcess = currentEvent; // Let it proceed to the check
+        } else {
+             return { ok: false, reason: 'No current or finished gameweek found.' };
+        }
     }
 
-    currentGw = currentEvent.id;
-    isFinished = currentEvent.is_finished;
+    currentGw = eventToProcess.id;
+    isFinished = eventToProcess.is_finished;
     previousGwId = currentGw > 1 ? currentGw - 1 : undefined;
 
-    console.log(`[Cron] Current GW: ${currentGw}, finished: ${isFinished}`);
+    console.log(`[Cron] Processing GW: ${currentGw}, finished: ${isFinished}`);
 
     // 3. Get last processed state from Vercel Blob
     try {
-      const { blobs } = await list();
-      const stateBlob = blobs.find((b: any) => b.pathname === 'fpl-butler/last-processed.json');
-      if (stateBlob) {
+      const { blobs } = await list({ prefix: 'fpl-butler/last-processed.json' });
+      if (blobs.length > 0) {
+        const stateBlob = blobs[0];
         const stateText = await (await fetch(stateBlob.url)).text();
         const state: ProcessedState = JSON.parse(stateText);
         lastProcessedGwBefore = state.lastProcessedGw;
@@ -173,11 +115,11 @@ export async function runCheck(): Promise<CheckResult> {
 
     // 4. Check if we should trigger action
     if (isFinished && currentGw > lastProcessedGwBefore) {
-      console.log(`[Cron] GW ${currentGw} is finished and not yet processed. Updating state...`);
+      console.log(`[Cron] GW ${currentGw} is finished and not yet processed. Generating summary...`);
 
-      // 5. Generate AI summary for the finished gameweek
-      console.log(`[Cron] Generating AI summary for finished GW ${currentGw}...`);
-      const aiSummary = await generateAISummaryForGW(currentGw);
+      // 5. Generate AI summary using the new comprehensive stats generator
+      const weeklyStats = await generateComprehensiveWeeklyStats(currentGw);
+      const aiSummary = generateButlerAssessment({ weeklyStats });
       
       const aiSummaryData: AISummary = {
         gameweek: currentGw,
@@ -185,10 +127,11 @@ export async function runCheck(): Promise<CheckResult> {
         generatedAt: checkedAt
       };
 
-      // Store AI summary in Blob (uses fpl-butler-blob storage)
+      // Store AI summary in Blob
       await put('ai-summary.json', JSON.stringify(aiSummaryData, null, 2), {
         access: 'public',
-        contentType: 'application/json'
+        contentType: 'application/json',
+        token: process.env.BLOB_READ_WRITE_TOKEN
       });
 
       console.log(`[Cron] Stored AI summary for GW ${currentGw}: "${aiSummary.substring(0, 50)}..."`);
@@ -201,37 +144,14 @@ export async function runCheck(): Promise<CheckResult> {
 
       await put('fpl-butler/last-processed.json', JSON.stringify(newState, null, 2), {
         access: 'public',
-        contentType: 'application/json'
+        contentType: 'application/json',
+        token: process.env.BLOB_READ_WRITE_TOKEN
       });
 
       console.log(`[Cron] Updated blob with GW ${currentGw}`);
+      
+      didTrigger = true; // Mark that we did work
 
-      // 7. Trigger deploy hook if configured
-      const deployHookUrl = process.env.VERCEL_DEPLOY_HOOK_URL;
-      if (deployHookUrl) {
-        try {
-          console.log('[Cron] Triggering deploy hook...');
-          const hookResponse = await fetch(deployHookUrl, {
-            method: 'POST',
-            headers: {
-              'User-Agent': 'Mozilla/5.0 (compatible; FPL-Butler/1.0)',
-            },
-            // Note: timeout is not a standard fetch option, using signal instead would be better
-          });
-
-          if (hookResponse.ok) {
-            didTrigger = true;
-            console.log('[Cron] Deploy hook triggered successfully');
-          } else {
-            console.log(`[Cron] Deploy hook failed: ${hookResponse.status}`);
-          }
-        } catch (hookError) {
-          console.log('[Cron] Deploy hook error (non-fatal):', hookError);
-          // Don't fail the whole function for hook errors
-        }
-      } else {
-        console.log('[Cron] No deploy hook URL configured');
-      }
     } else if (isFinished) {
       console.log(`[Cron] GW ${currentGw} already processed (last: ${lastProcessedGwBefore})`);
     } else {
@@ -265,26 +185,29 @@ export async function runCheck(): Promise<CheckResult> {
 
 /**
  * Vercel Cron endpoint
- * Runs every hour at minute 0 (configured in vercel.json)
+ * Runs on a schedule defined in vercel.json
  */
-export default async function handler(req: any, res: any) {
-  // Only allow GET/POST for cron triggers
+export default async function handler(
+  req: VercelRequest,
+  res: VercelResponse,
+) {
   if (req.method !== 'GET' && req.method !== 'POST') {
+    res.setHeader('Allow', ['GET', 'POST']);
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  console.log('[Cron] Starting gameweek check...');
-  
-  const result = await runCheck();
-  
-  console.log(`[Cron] Check complete. Result:`, {
-    ok: result.ok,
-    currentGw: result.currentGw,
-    isFinished: result.isFinished,
-    didTrigger: result.didTrigger
-  });
-
-  // Return result with no-store cache to prevent caching cron responses
-  res.setHeader('Cache-Control', 'no-store, max-age=0');
-  return res.status(200).json(result);
+  try {
+    console.log('[Cron] Starting gameweek check...');
+    const result = await runCheck();
+    console.log('[Cron] Check complete.', result);
+    res.setHeader('Cache-Control', 'no-store, max-age=0');
+    return res.status(200).json(result);
+  } catch (error) {
+    console.error('[Cron] Handler caught unhandled error:', error);
+    return res.status(500).json({
+        ok: false,
+        reason: 'Cron handler failed unexpectedly',
+        error: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
 }
