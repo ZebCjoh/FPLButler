@@ -557,10 +557,11 @@ export const App = () => {
                         }
                       `}>
                         
-                        <div className="relative z-10 p-4 h-full flex flex-col justify-center items-center text-center">
-                          {/* Rank Badge */}
+                        {/* CSS Grid Layout: 3 fixed sections */}
+                        <div className="relative z-10 p-4 h-full grid grid-rows-[auto_1fr_auto] gap-2 text-center">
+                          {/* Section 1: Rank Badge (fixed height) */}
                           <div className={`
-                            w-14 h-14 mx-auto mb-3 rounded-full flex items-center justify-center text-xl font-bold shadow-lg border-2
+                            w-14 h-14 mx-auto rounded-full flex items-center justify-center text-xl font-bold shadow-lg border-2
                             ${rank === 1 
                               ? 'bg-gradient-to-br from-[#FFD700] to-[#FFA500] text-black border-white' 
                               : 'bg-[#00E0D3]/80 text-[#3D195B] border-white/80'
@@ -569,14 +570,16 @@ export const App = () => {
                             {rank}
                           </div>
                           
-                          {/* Team Info with consistent spacing */}
-                          <h3 className="text-sm font-bold text-white mb-1 leading-tight px-1 break-words">
-                            {teamName}
-                          </h3>
-                          <p className="text-xs text-white/90 mb-3 font-medium">av {manager}</p>
+                          {/* Section 2: Team Info (flexible height, min-height for 2 lines) */}
+                          <div className="min-h-[60px] flex flex-col justify-center px-1">
+                            <h3 className="text-sm font-bold text-white mb-1 leading-tight break-words">
+                              {teamName}
+                            </h3>
+                            <p className="text-xs text-white/90 font-medium">av {manager}</p>
+                          </div>
                           
-                          {/* Points Display with consistent spacing */}
-                          <div className="bg-[#00E0D3]/20 border border-[#00E0D3] rounded-lg p-3 w-full mt-auto">
+                          {/* Section 3: Points Display (fixed at bottom) */}
+                          <div className="bg-[#00E0D3]/20 border border-[#00E0D3] rounded-lg p-3 w-full">
                             <div className="text-xl font-bold text-white">
                               {points}
                             </div>
