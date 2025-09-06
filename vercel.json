@@ -1,86 +1,17 @@
 {
   "crons": [
-    {
-      "path": "/api/cron/check-gw",
-      "schedule": "0 10 * * *"
-    }
+    { "path": "/api/cron/check-gw", "schedule": "0 10 * * *" }
   ],
   "functions": {
-    "api/bootstrap-static.ts": {
-      "memory": 1024,
-      "maxDuration": 30
-    },
-    "api/league/[leagueId].ts": {
-      "memory": 1024,
-      "maxDuration": 30
-    },
-    "api/event/[gameweek]/live.ts": {
-      "memory": 1024,
-      "maxDuration": 30
-    },
-    "api/entry/[entryId]/event/[gameweek]/picks.ts": {
-      "memory": 1024,
-      "maxDuration": 30
-    },
-    "api/entry/[entryId]/history.ts": {
-      "memory": 1024,
-      "maxDuration": 30
-    },
-    "api/entry/[entryId]/transfers.ts": {
-      "memory": 1024,
-      "maxDuration": 30
-    },
-    "api/cron/check-gw.ts": {
-      "memory": 512,
-      "maxDuration": 60
-    },
-    "api/cron/test.ts": {
-      "memory": 512,
-      "maxDuration": 60
-    }
+    "api/cron/check-gw.ts": { "memory": 512, "maxDuration": 60 }
   },
-  "rewrites": [
-    {
-      "source": "/api/bootstrap-static",
-      "destination": "/api/bootstrap-static"
-    },
-    {
-      "source": "/api/league/:leagueId",
-      "destination": "/api/league/:leagueId"
-    },
-    {
-      "source": "/api/event/:gameweek/live",
-      "destination": "/api/event/:gameweek/live"
-    },
-    {
-      "source": "/api/entry/:entryId/event/:gameweek/picks",
-      "destination": "/api/entry/:entryId/event/:gameweek/picks"
-    },
-    {
-      "source": "/api/entry/:entryId/history",
-      "destination": "/api/entry/:entryId/history"
-    },
-    {
-      "source": "/api/entry/:entryId/transfers",
-      "destination": "/api/entry/:entryId/transfers"
-    }
-  ],
   "headers": [
     {
       "source": "/api/(.*)",
       "headers": [
-        {
-          "key": "Access-Control-Allow-Origin",
-          "value": "*"
-        },
-        {
-          "key": "Access-Control-Allow-Methods",
-          "value": "GET, POST, OPTIONS"
-        },
-        {
-          "key": "Access-Control-Allow-Headers",
-          "value": "Content-Type"
-        }
+        { "key": "Access-Control-Allow-Origin", "value": "*" },
+        { "key": "Access-Control-Allow-Methods", "value": "GET, POST, OPTIONS" },
+        { "key": "Access-Control-Allow-Headers", "value": "Content-Type" }
       ]
     }
   ]

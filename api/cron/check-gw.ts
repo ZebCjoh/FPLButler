@@ -28,18 +28,6 @@ interface AISummary {
   generatedAt: string;
 }
 
-interface CheckResult {
-  ok: boolean;
-  checkedAt: string;
-  currentGw: number | null;
-  isFinished: boolean;
-  lastProcessedGwBefore: number;
-  didTrigger: boolean;
-  previousGwId?: number;
-  reason?: string;
-  aiSummaryGenerated?: boolean;
-}
-
 /**
  * Core logic for checking gameweek status and triggering actions
  * Separated for easy testing and reuse

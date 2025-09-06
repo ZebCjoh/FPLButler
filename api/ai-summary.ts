@@ -1,4 +1,4 @@
-import { put, get } from '@vercel/blob';
+import { put, list } from '@vercel/blob';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 // This function now uses the Vercel Node.js runtime.
@@ -34,17 +34,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (req.method === 'GET') {
-      const blob = await get('ai-summary.json', { token });
-      
-      if (!blob) {
+      const { blobs } = await list({ token });
+      const stateBlob = blobs.find((b: any) => b.pathname === 'ai-summary.json');
+      if (!stateBlob) {
         return res.status(200).json({
           ok: false,
           error: 'No summary found yet',
           summary: '🍷 No summary is available yet. Please check back later.'
         });
       }
-      
-      const text = await blob.text();
+
+      const text = await (await fetch(stateBlob.url)).text();
       res.setHeader('Content-Type', 'application/json');
       return res.status(200).send(text);
     }
