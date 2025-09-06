@@ -537,57 +537,60 @@ export const App = () => {
                     ))}
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch">
                     {topThree.map(({ rank, teamName, manager, points }) => (
-                    <div
-                      key={rank}
-                      className={`
-                        relative group cursor-pointer transform transition-all duration-300 hover:scale-105
-                        ${rank === 1 ? 'md:order-2' : rank === 2 ? 'md:order-1 md:mt-4' : 'md:order-3 md:mt-4'}
-                      `}
-                    >
-                      {/* Smaller Podium Cards */}
-                      <div className={`
-                        relative overflow-visible rounded-xl shadow-xl border-2
-                        ${rank === 1 
-                          ? 'bg-[#3D195B] border-[#FFD700] h-48' 
-                          : rank === 2
-                          ? 'bg-[#360D3A] border-[#00E0D3]/80 h-48'
-                          : 'bg-[#2D0A2E] border-[#00E0D3]/60 h-48'
-                        }
-                      `}>
-                        
-                        {/* CSS Grid Layout: 3 fixed sections */}
-                        <div className="relative z-10 p-4 h-full grid grid-rows-[auto_1fr_auto] gap-2 text-center">
-                          {/* Section 1: Rank Badge (fixed height) */}
-                          <div className={`
-                            w-14 h-14 mx-auto rounded-full flex items-center justify-center text-xl font-bold shadow-lg border-2
-                            ${rank === 1 
-                              ? 'bg-gradient-to-br from-[#FFD700] to-[#FFA500] text-black border-white' 
-                              : 'bg-[#00E0D3]/80 text-[#3D195B] border-white/80'
-                            }
-                          `}>
-                            {rank}
-                          </div>
+                      <div
+                        key={rank}
+                        className={`
+                          h-full group cursor-pointer transform transition-all duration-300 hover:scale-105
+                          ${rank === 1 ? 'md:order-2' : rank === 2 ? 'md:order-1 md:mt-4' : 'md:order-3 md:mt-4'}
+                        `}
+                      >
+                        {/* Card with flex column layout */}
+                        <div className={`
+                          flex h-full flex-col rounded-xl shadow-xl border-2 p-6
+                          ${rank === 1 
+                            ? 'bg-[#3D195B] border-[#FFD700]' 
+                            : rank === 2
+                            ? 'bg-[#360D3A] border-[#00E0D3]/80'
+                            : 'bg-[#2D0A2E] border-[#00E0D3]/60'
+                          }
+                        `}>
                           
-                          {/* Section 2: Team Info (flexible height, min-height for 2 lines) */}
-                          <div className="min-h-[60px] flex flex-col justify-center px-1">
-                            <h3 className="text-sm font-bold text-white mb-1 leading-tight break-words">
+                          {/* Rank Badge */}
+                          <div className="flex items-center justify-center">
+                            <div className={`
+                              w-14 h-14 rounded-full flex items-center justify-center text-xl font-bold shadow-lg border-2
+                              ${rank === 1 
+                                ? 'bg-gradient-to-br from-[#FFD700] to-[#FFA500] text-black border-white' 
+                                : 'bg-[#00E0D3]/80 text-[#3D195B] border-white/80'
+                              }
+                            `}>
+                              {rank}
+                            </div>
+                          </div>
+
+                          {/* Team Info Block */}
+                          <div className="mt-4 flex flex-col items-center text-center">
+                            <h3 className="font-bold text-white leading-tight max-w-[18ch] clamp-2 text-sm">
                               {teamName}
                             </h3>
-                            <p className="text-xs text-white/90 font-medium">av {manager}</p>
+                            <p className="mt-1 text-xs text-white/90 font-medium">av {manager}</p>
                           </div>
-                          
-                          {/* Section 3: Points Display (fixed at bottom) */}
-                          <div className="bg-[#00E0D3]/20 border border-[#00E0D3] rounded-lg p-3 w-full">
-                            <div className="text-xl font-bold text-white">
-                              {points}
+
+                          {/* Spacer to lock layout - adjust min-height based on your font sizes */}
+                          <div className="mt-2 min-h-[72px]"></div>
+
+                          {/* Points Box - always at bottom with mt-auto */}
+                          <div className="mt-auto pt-6">
+                            <div className="bg-[#00E0D3]/20 border border-[#00E0D3] rounded-lg px-4 py-3 text-center">
+                              <div className="text-xl font-bold text-white">{points}</div>
+                              <div className="text-xs text-white/90">poeng</div>
                             </div>
-                            <div className="text-white/90 text-xs">poeng</div>
                           </div>
+
                         </div>
                       </div>
-                    </div>
                     ))}
                   </div>
                 )}
