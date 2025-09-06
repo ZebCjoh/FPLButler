@@ -1,5 +1,4 @@
 import { FPL_LEAGUE_ID } from '../api/config';
-import type { BootstrapData as BootstrapStaticData, LeagueStandings, LiveGameweekData, TeamPicks as ManagerPicks } from '../api/types';
 
 interface WeeklyStats {
   weekWinner: { manager: string; points: number; teamName: string };
@@ -28,12 +27,11 @@ export async function generateComprehensiveWeeklyStats(gameweek: number): Promis
   console.log(`[summaryGenerator] Starting comprehensive stat generation for GW ${gameweek}`);
 
   // 1. Fetch bootstrap and league data
-  const bootstrapData = await fetchFPL<BootstrapStaticData>('https://fantasy.premierleague.com/api/bootstrap-static/');
-  const leagueData = await fetchFPL<LeagueStandings>(`https://fantasy.premierleague.com/api/leagues-classic/${FPL_LEAGUE_ID}/standings/`);
-  const liveData = await fetchFPL<LiveGameweekData>(`https://fantasy.premierleague.com/api/event/${gameweek}/live/`);
+  const bootstrapData: any = await fetchFPL<any>('https://fantasy.premierleague.com/api/bootstrap-static/');
+  const leagueData: any = await fetchFPL<any>(`https://fantasy.premierleague.com/api/leagues-classic/${FPL_LEAGUE_ID}/standings/`);
+  const liveData: any = await fetchFPL<any>(`https://fantasy.premierleague.com/api/event/${gameweek}/live/`);
 
-  const players = (bootstrapData as any).elements as Array<{ id: number; web_name: string }>;
-  const standings = (leagueData as any).standings.results as Array<{
+  const standings = leagueData.standings.results as Array<{
     entry: number;
     entry_name: string;
     player_name: string;
@@ -43,23 +41,22 @@ export async function generateComprehensiveWeeklyStats(gameweek: number): Promis
     event_total?: number;
   }>;
 
-  const livePointsMap = new Map<number, number>((liveData as any).elements.map((p: any) => [Number(p.id || p.element || p), p.stats.total_points]));
+  const livePointsMap = new Map<number, number>((liveData.elements || []).map((p: any) => [Number(p.id ?? p.element ?? 0), p.stats?.total_points ?? 0]));
 
   // 2. Fetch data for each manager in the league
   const managerIds = standings.map((s) => s.entry);
   const managerDataPromises = managerIds.map(async (id) => {
     try {
-      const picks = await fetchFPL<ManagerPicks>(`https://fantasy.premierleague.com/api/entry/${id}/event/${gameweek}/picks/`);
-      // History/transfers are not strictly required for the textual summary; skip to reduce errors
-      return { id, picks } as { id: number; picks: ManagerPicks };
+      const picks: any = await fetchFPL<any>(`https://fantasy.premierleague.com/api/entry/${id}/event/${gameweek}/picks/`);
+      return { id, picks } as { id: number; picks: any };
     } catch (error) {
       console.warn(`[summaryGenerator] Failed to fetch picks for manager ${id}. Skipping.`, error);
-      return { id, picks: null as unknown as ManagerPicks };
+      return { id, picks: null as unknown as any };
     }
   });
 
   const managerData = await Promise.all(managerDataPromises);
-  const managerDataMap = new Map<number, { id: number; picks: ManagerPicks }>(managerData.map((m) => [m.id, m as any]));
+  const managerDataMap = new Map<number, { id: number; picks: any }>(managerData.map((m) => [m.id, m as any]));
 
   // 3. Calculate all the detailed stats
   const chipsUsed: WeeklyStats['chipsUsed'] = [];
@@ -67,12 +64,12 @@ export async function generateComprehensiveWeeklyStats(gameweek: number): Promis
 
   for (const manager of standings) {
     const data = managerDataMap.get(manager.entry);
-    if (!data || !data.picks || !(data.picks as any).picks) continue;
+    if (!data || !data.picks || !data.picks.picks) continue;
 
-    const typedPicks = (data.picks as any).picks as Array<{ element: number; multiplier: number }>;
+    const typedPicks = data.picks.picks as Array<{ element: number; multiplier: number }>;
 
     // Chips
-    const activeChip = (data.picks as any).active_chip as string | null;
+    const activeChip = data.picks.active_chip as string | null;
     if (activeChip) {
       const chipEmoji: Record<string, string> = {
         triple_captain: '⚡',
@@ -110,14 +107,14 @@ export async function generateComprehensiveWeeklyStats(gameweek: number): Promis
   const weeklyStats = {
     currentGw: gameweek,
     weekWinner: {
-      manager: weekWinner.player_name,
-      teamName: weekWinner.entry_name,
-      points: weekWinner.event_total || 0,
+      manager: weekWinner?.player_name || '-',
+      teamName: weekWinner?.entry_name || '-',
+      points: weekWinner?.event_total || 0,
     },
     weekLoser: {
-      manager: weekLoser.player_name,
-      teamName: weekLoser.entry_name,
-      points: weekLoser.event_total || 0,
+      manager: weekLoser?.player_name || '-',
+      teamName: weekLoser?.entry_name || '-',
+      points: weekLoser?.event_total || 0,
     },
     benchWarmer: {
       manager: benchWarmer?.manager || '-',
