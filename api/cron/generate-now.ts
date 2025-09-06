@@ -225,6 +225,32 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const weeklyStats = await generateComprehensiveWeeklyStats(gw);
     const summary = generateButlerAssessment({ weeklyStats });
 
+    // Get league data for top3/bottom3
+    const FPL_LEAGUE_ID = 155099;
+    const leagueData: any = await fetchFPL<any>(`https://fantasy.premierleague.com/api/leagues-classic/${FPL_LEAGUE_ID}/standings/`);
+    const standings = leagueData.standings.results;
+    
+    // Prepare complete dataset for snapshot
+    const top3 = standings.slice(0, 3).map((entry: any) => ({
+      rank: entry.rank,
+      teamName: entry.entry_name,
+      managerName: entry.player_name,
+      points: entry.total
+    }));
+    
+    const bottom3 = standings.slice(-3).reverse().map((entry: any) => ({
+      rank: entry.rank,
+      teamName: entry.entry_name,
+      managerName: entry.player_name,
+      points: entry.total
+    }));
+
+    // Get form data for hot/cold
+    const formResponse = await fetch(`${process.env.VERCEL_URL || 'https://fpl-butler.vercel.app'}/api/league/${FPL_LEAGUE_ID}/form?window=3`, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; FPL-Butler/1.0)' }
+    });
+    const formData = formResponse.ok ? await formResponse.json() : { hot: [], cold: [] };
+
     const payload = {
       gameweek: gw,
       summary,
@@ -238,7 +264,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       addRandomSuffix: false
     });
 
-    // Also save to history via internal API call
+    // Save complete snapshot to history via internal API call
     try {
       const baseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://fpl-butler.vercel.app';
       const historyResponse = await fetch(`${baseUrl}/api/ai-summary`, {
@@ -248,7 +274,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         },
         body: JSON.stringify({
           gameweek: gw,
-          summary: summary
+          summary: summary,
+          top3: top3,
+          bottom3: bottom3,
+          form: {
+            hot: formData.hot || [],
+            cold: formData.cold || []
+          },
+          weeklyStats: weeklyStats,
+          highlights: [
+            { text: `Rundens helt: ${weeklyStats.weekWinner?.manager} med ${weeklyStats.weekWinner?.points} poeng` },
+            { text: `${weeklyStats.chipsUsed?.length || 0} chips ble aktivert denne runden` },
+            { text: `Største bevegelse: ${weeklyStats.movements?.riser?.manager} (+${weeklyStats.movements?.riser?.change || 0} plasser)` }
+          ]
         })
       });
       

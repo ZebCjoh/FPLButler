@@ -262,6 +262,14 @@ export async function runCheck() {
       const weeklyStats = await generateComprehensiveWeeklyStats(currentGw);
       const aiSummary = generateButlerAssessment({ weeklyStats });
       
+      // Get league data for complete snapshot
+      const FPL_LEAGUE_ID = 155099;
+      const leagueResponse = await fetch(`https://fantasy.premierleague.com/api/leagues-classic/${FPL_LEAGUE_ID}/standings/`, {
+        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; FPL-Butler/1.0)' }
+      });
+      const leagueData = await leagueResponse.json();
+      const standings = leagueData.standings.results;
+      
       const aiSummaryData: AISummary = {
         gameweek: currentGw,
         summary: aiSummary,
@@ -275,7 +283,28 @@ export async function runCheck() {
         token: process.env.BLOB_READ_WRITE_TOKEN
       });
 
-      // Also save to history via internal API call
+      // Prepare complete snapshot data
+      const top3 = standings.slice(0, 3).map((entry: any) => ({
+        rank: entry.rank,
+        teamName: entry.entry_name,
+        managerName: entry.player_name,
+        points: entry.total
+      }));
+      
+      const bottom3 = standings.slice(-3).reverse().map((entry: any) => ({
+        rank: entry.rank,
+        teamName: entry.entry_name,
+        managerName: entry.player_name,
+        points: entry.total
+      }));
+
+      // Get form data
+      const formResponse = await fetch(`${process.env.VERCEL_URL || 'http://localhost:3000'}/api/league/${FPL_LEAGUE_ID}/form?window=3`, {
+        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; FPL-Butler/1.0)' }
+      });
+      const formData = formResponse.ok ? await formResponse.json() : { hot: [], cold: [] };
+
+      // Save complete snapshot to history via internal API call
       try {
         const response = await fetch(`${process.env.VERCEL_URL || 'http://localhost:3000'}/api/ai-summary`, {
           method: 'POST',
@@ -284,7 +313,19 @@ export async function runCheck() {
           },
           body: JSON.stringify({
             gameweek: currentGw,
-            summary: aiSummary
+            summary: aiSummary,
+            top3: top3,
+            bottom3: bottom3,
+            form: {
+              hot: formData.hot || [],
+              cold: formData.cold || []
+            },
+            weeklyStats: weeklyStats,
+            highlights: [
+              { text: `Rundens helt: ${weeklyStats.weekWinner?.manager} med ${weeklyStats.weekWinner?.points} poeng` },
+              { text: `${weeklyStats.chipsUsed?.length || 0} chips ble aktivert denne runden` },
+              { text: `Største bevegelse: ${weeklyStats.movements?.riser?.manager} (+${weeklyStats.movements?.riser?.change || 0} plasser)` }
+            ]
           })
         });
         

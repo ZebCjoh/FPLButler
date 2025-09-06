@@ -11,18 +11,31 @@ interface GameweekData {
   id: number;
   gameweek: number;
   summary: string;
+  top3?: any[];
+  bottom3?: any[];
+  form?: {
+    hot: any[];
+    cold: any[];
+  };
+  weeklyStats?: any;
+  highlights?: any[];
   createdAt: string;
 }
 
 // Helper function to save gameweek history
-async function saveGameweekHistory(gameweek: number, summary: string, token: string) {
+async function saveGameweekHistory(gameweek: number, fullData: any, token: string) {
   const createdAt = new Date().toISOString();
   
-  // 1. Save individual gameweek file
+  // 1. Save individual gameweek file with complete data
   const gameweekData: GameweekData = {
     id: gameweek,
     gameweek,
-    summary,
+    summary: fullData.summary || '',
+    top3: fullData.top3 || [],
+    bottom3: fullData.bottom3 || [],
+    form: fullData.form || { hot: [], cold: [] },
+    weeklyStats: fullData.weeklyStats || {},
+    highlights: fullData.highlights || [],
     createdAt
   };
   
@@ -49,6 +62,7 @@ async function saveGameweekHistory(gameweek: number, summary: string, token: str
   }
   
   // Generate title from summary (first sentence or fallback)
+  const summary = fullData.summary || '';
   const firstSentence = summary.split('.')[0] + '.';
   const title = firstSentence.length > 50 
     ? `GW ${gameweek} – ${firstSentence.substring(0, 47)}...`
@@ -102,14 +116,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   
   try {
     if (req.method === 'POST') {
-      // Get gameweek and summary from request body
-      const { gameweek, summary } = req.body || {};
+      // Accept either simple {gameweek, summary} or full gameweek data
+      const body = req.body || {};
+      const gameweek = body.gameweek;
+      const summary = body.summary;
       
       if (!gameweek || !summary) {
         return res.status(400).json({ error: 'Missing gameweek or summary in request body' });
       }
       
-      // Save current AI summary
+      // Save current AI summary (simple format for compatibility)
       const { url } = await put('ai-summary.json', JSON.stringify({
         gameweek,
         summary
@@ -120,8 +136,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         addRandomSuffix: false // Important to overwrite the same file
       });
       
-      // Save to history
-      await saveGameweekHistory(gameweek, summary, token);
+      // Save to history with full data if provided, otherwise just summary
+      const fullData = {
+        summary,
+        top3: body.top3 || [],
+        bottom3: body.bottom3 || [],
+        form: body.form || { hot: [], cold: [] },
+        weeklyStats: body.weeklyStats || {},
+        highlights: body.highlights || []
+      };
+      
+      await saveGameweekHistory(gameweek, fullData, token);
       
       return res.status(200).json({ success: true, url, gameweek, historySaved: true });
     }
