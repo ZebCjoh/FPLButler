@@ -1,4 +1,8 @@
-import { put, list } from '@vercel/blob';
+import { put, get } from '@vercel/blob';
+
+export const config = {
+  // runtime: 'edge' // Fjernet for å bytte til Node.js-runtime for stabilitet
+};
 
 export default async function handler(req: Request): Promise<Response> {
   try {
@@ -31,7 +35,12 @@ export default async function handler(req: Request): Promise<Response> {
       const { url } = await put('ai-summary.json', JSON.stringify({
         gameweek: 3,
         summary: "Dette er en testoppsummering fra backend. Skal være identisk på alle refresh."
-      }), { access: 'public', contentType: 'application/json', token, addRandomSuffix: false });
+      }), {
+        access: 'public',
+        contentType: 'application/json',
+        token,
+        addRandomSuffix: false
+      });
       return new Response(JSON.stringify({ success: true, url }), {
         status: 200,
         headers: {
@@ -42,54 +51,25 @@ export default async function handler(req: Request): Promise<Response> {
     }
 
     if (req.method === 'GET') {
-      // Finn faktisk offentlig URL via Blob API + token, ellers bruk evt. env-url
       const token = (process.env as any).BLOB_READ_WRITE_TOKEN;
-      const publicUrlFromEnv = (process.env as any).BLOB_PUBLIC_AI_SUMMARY_URL as string | undefined;
-      let resolvedUrl: string | undefined = undefined;
-
       try {
-        if (token) {
-          const { blobs } = await list({ token });
-          const match = blobs.find((b: any) => b.pathname === 'ai-summary.json');
-          if (match?.url) resolvedUrl = match.url as string;
-        }
-        if (!resolvedUrl && publicUrlFromEnv) {
-          resolvedUrl = publicUrlFromEnv;
-        }
-
-        if (!resolvedUrl) {
-          return new Response(JSON.stringify({
+        const blob = await get('ai-summary.json', { token });
+        
+        if (!blob) {
+           return new Response(JSON.stringify({
             ok: false,
             error: 'No summary found yet',
             summary: '🍷 Ingen oppsummering tilgjengelig ennå. Kom tilbake senere.'
           }), {
-            status: 200,
+            status: 200, // Returnerer 200 for å unngå at frontend krasjer
             headers: {
               'Content-Type': 'application/json',
               'Access-Control-Allow-Origin': '*'
             }
           });
         }
-
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 5000);
-        const resp = await fetch(resolvedUrl, { cache: 'no-store', signal: controller.signal });
-        clearTimeout(timeout);
-
-        if (!resp.ok) {
-          return new Response(JSON.stringify({
-            ok: false,
-            error: 'No summary found yet',
-            summary: '🍷 Ingen oppsummering tilgjengelig ennå. Kom tilbake senere.'
-          }), {
-            status: 200,
-            headers: {
-              'Content-Type': 'application/json',
-              'Access-Control-Allow-Origin': '*'
-            }
-          });
-        }
-        const text = await resp.text();
+        
+        const text = await blob.text();
         return new Response(text, {
           status: 200,
           headers: {
@@ -97,11 +77,12 @@ export default async function handler(req: Request): Promise<Response> {
             'Access-Control-Allow-Origin': '*'
           }
         });
+
       } catch (e) {
         return new Response(JSON.stringify({
           ok: false,
           error: 'Blob fetch failed',
-          summary: '🍷 Ingen oppsummering tilgjengelig ennå (midlertidig fallback).'
+          summary: '🍷 Ingen oppsummering tilgjengelig ennå (feil under henting).'
         }), {
           status: 200,
           headers: {
