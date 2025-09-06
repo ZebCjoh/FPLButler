@@ -44,8 +44,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
       }
 
-      const text = await (await fetch(stateBlob.url)).text();
+      // Avoid CDN stale cache by appending a cache-busting query param and disabling request cache
+      const bust = Date.now();
+      const text = await (await fetch(`${stateBlob.url}?ts=${bust}`, { cache: 'no-store' as RequestCache })).text();
       res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Cache-Control', 'no-store, max-age=0');
       return res.status(200).send(text);
     }
 
