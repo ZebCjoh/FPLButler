@@ -17,9 +17,9 @@ interface LeagueEntry {
   total?: number;
 }
 
-interface LeagueStandings {
-  results: LeagueEntry[];
-}
+// interface LeagueStandings {
+//   results: LeagueEntry[];
+// }
 
 interface HistoryEvent {
   event: number;

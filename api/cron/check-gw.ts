@@ -52,15 +52,15 @@ function generateButlerAssessment(data: { weeklyStats: any }): string {
   const { weeklyStats } = data; 
   if (!weeklyStats) return 'Butleren er for opptatt med å observere kompetente mennesker til å kommentere denne uken.';
   
-  const { weekWinner, weekLoser, benchWarmer } = weeklyStats;
-  const riser = weeklyStats.movements?.riser; 
-  const faller = weeklyStats.movements?.faller; 
-  const chipsUsed = weeklyStats.chipsUsed || []; 
+  const { weekWinner, weekLoser } = weeklyStats;
+  // const riser = weeklyStats.movements?.riser; 
+  // const faller = weeklyStats.movements?.faller; 
+  // const chipsUsed = weeklyStats.chipsUsed || []; 
   const currentGw = weeklyStats.currentGw || 0;
   
   const hash = (s:string)=>{let h=2166136261; for(let i=0;i<s.length;i++){h^=s.charCodeAt(i); h+=(h<<1)+(h<<4)+(h<<7)+(h<<8)+(h<<24);} return h>>>0;};
   const pick = <T,>(arr:T[], seed:string)=>arr[Math.abs(hash(seed))%arr.length];
-  const seed = JSON.stringify({gw:currentGw,w:weekWinner?.manager,l:weekLoser?.manager,r:riser?.manager,f:faller?.manager,b:benchWarmer?.benchPoints});
+  const seed = JSON.stringify({gw:currentGw,w:weekWinner?.manager,l:weekLoser?.manager});
   
   // 5 forskjellige strukturer for maksimal variasjon
   const structures = [
@@ -152,7 +152,7 @@ function generateThematicStructure(weeklyStats: any, pick: any, seed: string): s
   
   const conclusions = ['Butleren noterer temaets gjennomslag.','Temaet bekreftes av resultatene.','Som alltid illustrerer temaet managernes essens.'];
   
-  return `${pick(themeIntros[selectedTheme] || themeIntros['Kaos'], seed+'|intro')} ${pick(analyses[selectedTheme] || analyses['Kaos'], seed+'|analysis')} ${pick(conclusions, seed+'|conclusion')}`;
+  return `${pick(themeIntros[selectedTheme as keyof typeof themeIntros] || themeIntros['Kaos'], seed+'|intro')} ${pick(analyses[selectedTheme as keyof typeof analyses] || analyses['Kaos'], seed+'|analysis')} ${pick(conclusions, seed+'|conclusion')}`;
 }
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
