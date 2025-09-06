@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { getHighlights } from './logic/metrics';
+import GameweekView from './components/GameweekView';
 
 export const App = () => {
   const [standings, setStandings] = useState<any[]>([]);
@@ -14,6 +15,8 @@ export const App = () => {
   const [error, setError] = useState<string | null>(null);
   const [butlerAssessment, setButlerAssessment] = useState<string>('');
   const [historyData, setHistoryData] = useState<any[]>([]);
+  const [currentView, setCurrentView] = useState<'home' | 'gameweek'>('home');
+  const [selectedGameweek, setSelectedGameweek] = useState<string>('');
 
   // Dynamiske høydepunkter kommer fra metrics.getHighlights i weeklyStats.highlights
 
@@ -475,6 +478,22 @@ export const App = () => {
     manager: team.player_name,
     points: team.total
   }));
+
+  // Handle back to home navigation
+  const handleBackToHome = () => {
+    setCurrentView('home');
+    setSelectedGameweek('');
+  };
+
+  // Render gameweek view if selected
+  if (currentView === 'gameweek') {
+    return (
+      <GameweekView 
+        gameweekId={selectedGameweek} 
+        onBackToHome={handleBackToHome}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#9B27E8] via-[#3E9BF9] to-[#00E0D3] relative overflow-hidden">
@@ -988,8 +1007,10 @@ export const App = () => {
                       defaultValue=""
                       onChange={(e) => {
                         if (e.target.value) {
-                          // Simple navigation - in a real React Router setup, you'd use useNavigate()
-                          window.location.href = e.target.value;
+                          // Extract gameweek ID from URL (e.g., "/gw/1" -> "1")
+                          const gwId = e.target.value.split('/').pop() || '';
+                          setSelectedGameweek(gwId);
+                          setCurrentView('gameweek');
                         }
                       }}
                     >
