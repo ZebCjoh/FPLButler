@@ -31,7 +31,7 @@ async function fetchWithRetry(url: string, options: RequestInit, retries = MAX_R
 }
 
 export default async function handler(
-  req: VercelRequest,
+  _req: VercelRequest,
   res: VercelResponse,
 ) {
   // Check cache first
