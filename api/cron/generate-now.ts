@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { put } from '@vercel/blob';
-import { generateComprehensiveWeeklyStats } from '../../src/logic/summaryGenerator';
-import { generateButlerAssessment } from '../../src/logic/butler';
+import { generateComprehensiveWeeklyStats } from '../_lib/summary';
+import { generateButlerAssessment } from '../_lib/butler';
 
 async function resolveTargetGw(): Promise<number> {
   const resp = await fetch('https://fantasy.premierleague.com/api/bootstrap-static/', {

@@ -1,6 +1,6 @@
 import { list, put } from '@vercel/blob';
-import { generateButlerAssessment } from '../../src/logic/butler';
-import { generateComprehensiveWeeklyStats } from '../../src/logic/summaryGenerator';
+import { generateButlerAssessment } from '../_lib/butler';
+import { generateComprehensiveWeeklyStats } from '../_lib/summary';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 
