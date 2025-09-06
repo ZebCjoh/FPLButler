@@ -546,9 +546,9 @@ export const App = () => {
                           ${rank === 1 ? 'md:order-2' : rank === 2 ? 'md:order-1 md:mt-4' : 'md:order-3 md:mt-4'}
                         `}
                       >
-                        {/* Card with flex column layout */}
+                        {/* Compact Card with justify-between layout */}
                         <div className={`
-                          flex h-full flex-col rounded-xl shadow-xl border-2 p-6
+                          flex h-full flex-col justify-between rounded-xl shadow-xl border-2 p-4
                           ${rank === 1 
                             ? 'bg-[#3D195B] border-[#FFD700]' 
                             : rank === 2
@@ -560,7 +560,7 @@ export const App = () => {
                           {/* Rank Badge */}
                           <div className="flex items-center justify-center">
                             <div className={`
-                              w-14 h-14 rounded-full flex items-center justify-center text-xl font-bold shadow-lg border-2
+                              w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold shadow-lg border-2
                               ${rank === 1 
                                 ? 'bg-gradient-to-br from-[#FFD700] to-[#FFA500] text-black border-white' 
                                 : 'bg-[#00E0D3]/80 text-[#3D195B] border-white/80'
@@ -570,23 +570,18 @@ export const App = () => {
                             </div>
                           </div>
 
-                          {/* Team Info Block */}
-                          <div className="mt-4 flex flex-col items-center text-center">
+                          {/* Team Info Block - with realistic min-height for 2 lines + manager */}
+                          <div className="flex flex-col items-center text-center min-h-[56px] justify-center">
                             <h3 className="font-bold text-white leading-tight max-w-[18ch] clamp-2 text-sm">
                               {teamName}
                             </h3>
                             <p className="mt-1 text-xs text-white/90 font-medium">av {manager}</p>
                           </div>
 
-                          {/* Spacer to lock layout - adjust min-height based on your font sizes */}
-                          <div className="mt-2 min-h-[72px]"></div>
-
-                          {/* Points Box - always at bottom with mt-auto */}
-                          <div className="mt-auto pt-6">
-                            <div className="bg-[#00E0D3]/20 border border-[#00E0D3] rounded-lg px-4 py-3 text-center">
-                              <div className="text-xl font-bold text-white">{points}</div>
-                              <div className="text-xs text-white/90">poeng</div>
-                            </div>
+                          {/* Points Box - no mt-auto needed with justify-between */}
+                          <div className="bg-[#00E0D3]/20 border border-[#00E0D3] rounded-lg px-3 py-2 text-center">
+                            <div className="text-lg font-bold text-white">{points}</div>
+                            <div className="text-xs text-white/90">poeng</div>
                           </div>
 
                         </div>
