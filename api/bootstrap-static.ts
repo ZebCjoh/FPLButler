@@ -1,122 +1,75 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' });
+// Cache configuration
+const CACHE_DURATION_SECONDS = 60; // 1 minute
+let cache = {
+  data: null as any,
+  timestamp: 0,
+};
+
+// Retry configuration
+const MAX_RETRIES = 3;
+const RETRY_DELAY_MS = 1000;
+
+async function fetchWithRetry(url: string, options: RequestInit, retries = MAX_RETRIES): Promise<Response> {
+  try {
+    const response = await fetch(url, options);
+    if (!response.ok && response.status >= 500 && retries > 0) {
+      console.warn(`FPL API request failed with status ${response.status}. Retrying... (${retries} retries left)`);
+      await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS));
+      return fetchWithRetry(url, options, retries - 1);
+    }
+    return response;
+  } catch (error) {
+    if (retries > 0) {
+      console.warn(`FPL API request failed with error: ${error}. Retrying... (${retries} retries left)`);
+      await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS));
+      return fetchWithRetry(url, options, retries - 1);
+    }
+    throw error;
+  }
+}
+
+export default async function handler(
+  req: VercelRequest,
+  res: VercelResponse,
+) {
+  // Check cache first
+  const now = Date.now();
+  if (cache.data && (now - cache.timestamp) < CACHE_DURATION_SECONDS * 1000) {
+    res.setHeader('X-Cache', 'HIT');
+    return res.status(200).json(cache.data);
   }
 
+  res.setHeader('X-Cache', 'MISS');
+
+  const FPL_API_URL = 'https://fantasy.premierleague.com/api/bootstrap-static/';
+  const requestOptions: RequestInit = {
+    headers: {
+      'User-Agent': 'FPLButler/1.0 (https://github.com/ZebCjoh/FPLButler)',
+    },
+  };
+
   try {
-    console.log('[API] Fetching bootstrap-static v2...');
-
-    // Helper: retry with exponential backoff for transient blocks/errors
-    const fetchWithRetry = async (url: string, init: RequestInit, attempts: number = 4): Promise<Response> => {
-      let lastError: any;
-      for (let attempt = 1; attempt <= attempts; attempt++) {
-        try {
-          const resp = await fetch(url, init);
-          if (resp.ok) return resp;
-          // Retry on common transient statuses
-          if ([403, 429, 500, 502, 503, 504].includes(resp.status)) {
-            console.warn(`[API] bootstrap-static attempt ${attempt} failed with ${resp.status}. Retrying...`);
-          } else {
-            return resp;
-          }
-        } catch (err) {
-          lastError = err;
-          console.warn(`[API] bootstrap-static attempt ${attempt} threw error. Retrying...`, err);
-        }
-        // Backoff with jitter: 200ms, 600ms, 1200ms, 2400ms...
-        const base = 200 * Math.pow(2, attempt - 1);
-        const jitter = Math.floor(Math.random() * 100);
-        await new Promise((r) => setTimeout(r, base + jitter));
-      }
-      if (lastError) throw lastError;
-      // Final fallback fetch to return the last response (non-ok) if no error captured
-      return fetch(url, init);
-    };
-
-    const primaryUrl = 'https://fantasy.premierleague.com/api/bootstrap-static/';
-    const fallbackUrl = 'https://r.jina.ai/http://fantasy.premierleague.com/api/bootstrap-static/';
-
-    const response = await fetchWithRetry(primaryUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; FPL-Butler/1.0)',
-        'Accept': 'application/json, text/plain, */*',
-        'Referer': 'https://fantasy.premierleague.com/',
-        'Accept-Language': 'en-US,en;q=0.9',
-        // Extra hints to mimic browser more closely
-        'Cache-Control': 'no-cache',
-        'Pragma': 'no-cache'
-      },
-    });
-
-    // Helper to parse JSON even if content-type is text/plain
-    const parseJsonFlexible = async (resp: Response) => {
-      const contentType = resp.headers.get('content-type') || '';
-      if (contentType.includes('application/json')) {
-        return resp.json();
-      }
-      const text = await resp.text();
-      try {
-        return JSON.parse(text);
-      } catch {
-        throw new Error(`Expected JSON, got content-type=${contentType}, length=${text.length}`);
-      }
-    };
+    const response = await fetchWithRetry(FPL_API_URL, requestOptions);
 
     if (!response.ok) {
-      console.warn('[API] [v2] Bootstrap primary failed:', response.status, response.statusText, '→ trying fallback');
-      const fb = await fetchWithRetry(fallbackUrl, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (compatible; FPL-Butler/1.0)',
-          'Accept': 'application/json, text/plain, */*'
-        }
-      });
-      if (!fb.ok) {
-        console.error('[API] [v2] Bootstrap fallback failed:', fb.status, fb.statusText);
-        return res.status(response.status).json({ 
-          error: `FPL API returned ${response.status} and fallback ${fb.status}`,
-          url: primaryUrl
-        });
-      }
-      const fbData = await parseJsonFlexible(fb);
-      console.log('[API] [v2] Bootstrap success via fallback');
-      res.setHeader('Cache-Control', 's-maxage=120, stale-while-revalidate=120');
-      return res.status(200).json(fbData);
+      const errorText = await response.text();
+      console.error(`Failed to fetch FPL data after multiple retries. Status: ${response.status}, Body: ${errorText}`);
+      return res.status(response.status).json({ error: `Failed to fetch data from FPL API. Status: ${response.status}` });
     }
 
-    const contentType = response.headers.get('content-type') || '';
-    let data: any;
-    try {
-      data = await parseJsonFlexible(response);
-    } catch (e) {
-      console.warn('[API] [v2] Primary returned non-JSON, trying fallback parser via mirror...');
-      const fb = await fetchWithRetry(fallbackUrl, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (compatible; FPL-Butler/1.0)',
-          'Accept': 'application/json, text/plain, */*'
-        }
-      });
-      if (!fb.ok) {
-        console.error('[API] [v2] Bootstrap fallback after parse failure failed:', fb.status, fb.statusText);
-        return res.status(500).json({ 
-          error: 'Expected JSON response from FPL API',
-          contentType
-        });
-      }
-      data = await parseJsonFlexible(fb);
-      console.log('[API] [v2] Bootstrap success via fallback after parse error');
-    }
-    
-    console.log('[API] Bootstrap success v2');
-    res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=600');
+    const data = await response.json();
+
+    // Update cache
+    cache = {
+      data,
+      timestamp: Date.now(),
+    };
+
     return res.status(200).json(data);
-
-  } catch (error) {
-    console.error('[API] Bootstrap error:', error);
-    return res.status(500).json({ 
-      error: 'Failed to fetch from FPL API',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    });
+  } catch (error: any) {
+    console.error('An unhandled error occurred while fetching FPL data:', error);
+    return res.status(500).json({ error: 'An internal server error occurred.', details: error.message });
   }
 }
