@@ -68,7 +68,7 @@ export const App = () => {
       try {
         // 1) Bootstrap for metadata (players, events, next deadline, current gw)
         console.log('[App] Fetching bootstrap data...');
-        const bootstrapResponse = await fetch('/api/bootstrap-static');
+        const bootstrapResponse = await fetch('/api/bootstrap-static', { cache: 'no-store' as RequestCache });
         if (!bootstrapResponse.ok) {
           console.error('[App] Bootstrap fetch failed:', bootstrapResponse.status, bootstrapResponse.statusText);
           throw new Error(`Bootstrap API failed: ${bootstrapResponse.status}`);
@@ -114,7 +114,7 @@ export const App = () => {
 
         // 3) League standings
         console.log('[App] Fetching league standings...');
-        const standingsResponse = await fetch('/api/league/155099');
+        const standingsResponse = await fetch('/api/league/155099', { cache: 'no-store' as RequestCache });
         if (!standingsResponse.ok) {
           console.error('[App] Standings fetch failed:', standingsResponse.status, standingsResponse.statusText);
           throw new Error(`Standings API failed: ${standingsResponse.status}`);
@@ -132,7 +132,7 @@ export const App = () => {
 
         // 3) Live GW data for player points map
         console.log('[App] Fetching live gameweek data...');
-        const liveResponse = await fetch(`/api/event/${currentGW}/live`);
+        const liveResponse = await fetch(`/api/event/${currentGW}/live`, { cache: 'no-store' as RequestCache });
         if (!liveResponse.ok) {
           console.error('[App] Live data fetch failed:', liveResponse.status, liveResponse.statusText);
           throw new Error(`Live data API failed: ${liveResponse.status}`);
