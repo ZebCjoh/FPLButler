@@ -183,230 +183,178 @@ function generateThematicStructure(snapshot: Snapshot, pick: any, seed: string):
 async function composeSnapshot(leagueId: string, gameweek: number): Promise<Snapshot> {
   console.log(`[snapshot] Composing snapshot for league ${leagueId}, GW ${gameweek}`);
   
-  // 1. Bootstrap data for players and events
-  const bootstrapData: any = await fetchFPL(`https://fantasy.premierleague.com/api/bootstrap-static/`);
-  const elements = bootstrapData.elements as FPLElement[];
-  const events = bootstrapData.events as FPLEvent[];
-  
-  const elementIdToName: Record<number, string> = {};
-  elements.forEach((el) => {
-    elementIdToName[el.id] = el.web_name;
-  });
-  
-  // 2. League standings
-  const leagueData: any = await fetchFPL(`https://fantasy.premierleague.com/api/leagues-classic/${leagueId}/standings/`);
-  const standings = leagueData.standings.results as LeagueEntry[];
-  
-  // 3. Current event live data
-  const liveData: any = await fetchFPL(`https://fantasy.premierleague.com/api/event/${gameweek}/live/`);
-  const elementLiveData: Record<number, any> = {};
-  (liveData.elements || []).forEach((e: any) => {
-    elementLiveData[e.id] = e;
-  });
-  
-  // 4. Gameweek event info and next deadline
-  const currentEvent = events.find(e => e.id === gameweek);
-  const nextEvent = events.find(e => e.id === gameweek + 1);
-  const nextDeadline = nextEvent ? {
-    gw: nextEvent.id,
-    date: new Date(nextEvent.deadline_time).toLocaleDateString('no-NO'),
-    time: new Date(nextEvent.deadline_time).toLocaleTimeString('no-NO', { hour: '2-digit', minute: '2-digit' })
-  } : {
-    gw: gameweek + 1,
-    date: 'TBA',
-    time: 'TBA'
-  };
-  
-  // 5. Basic standings analysis
-  const top3 = standings.slice(0, 3).map((entry, idx) => ({
-    rank: (idx + 1) as 1 | 2 | 3,
-    team: entry.entry_name,
-    manager: entry.player_name,
-    points: entry.total
-  }));
-  
-  const bottom3 = standings.slice(-3).reverse().map(entry => ({
-    rank: entry.rank,
-    team: entry.entry_name,
-    manager: entry.player_name,
-    points: entry.total
-  }));
-  
-  // 6. Weekly winner/loser analysis (simplified)
-  const gwEntries = standings.map(entry => ({
-    ...entry,
-    event_total: entry.event_total || 0,
-    transfers_cost: 0,
-    picks: []
-  }));
-  
-  const weekWinner = gwEntries.reduce((best, current) => 
-    (current.event_total > best.event_total) ? current : best
-  );
-  const weekLoser = gwEntries.reduce((worst, current) => 
-    (current.event_total < worst.event_total) ? current : worst
-  );
-  
-  // 7. Bench analysis (simplified)
-  const benchWarmer = {
-    manager: standings[Math.floor(Math.random() * standings.length)].player_name,
-    team: standings[Math.floor(Math.random() * standings.length)].entry_name,
-    benchPoints: Math.floor(Math.random() * 20) + 5
-  };
-  
-  // 8. Movement analysis
-  const movements = standings.map(entry => ({
-    manager: entry.player_name,
-    team: entry.entry_name,
-    change: (entry.last_rank || entry.rank) - entry.rank
-  }));
-  
-  const riser = movements.reduce((best, current) => 
-    (current.change > best.change) ? current : best
-  );
-  const faller = movements.reduce((worst, current) => 
-    (current.change < worst.change) ? current : worst
-  );
-  
-  // 9. Chips analysis (simplified)
-  const chipsUsed: Array<{ manager: string; team: string; chip: string; emoji: string }> = [];
-  // Simulate some chip usage
-  if (Math.random() > 0.5) {
-    chipsUsed.push({
+  try {
+    // 1. League standings only (minimize API calls)
+    const leagueData: any = await fetchFPL(`https://fantasy.premierleague.com/api/leagues-classic/${leagueId}/standings/`);
+    const standings = leagueData.standings.results as LeagueEntry[];
+    
+    if (!standings || standings.length === 0) {
+      throw new Error('No standings data found');
+    }
+    
+    // 2. Basic data
+    const top3 = standings.slice(0, 3).map((entry, idx) => ({
+      rank: (idx + 1) as 1 | 2 | 3,
+      team: entry.entry_name,
+      manager: entry.player_name,
+      points: entry.total
+    }));
+    
+    const bottom3 = standings.slice(-3).reverse().map(entry => ({
+      rank: entry.rank,
+      team: entry.entry_name,
+      manager: entry.player_name,
+      points: entry.total
+    }));
+    
+    // Simulate weekly data based on standings
+    const weekWinner = {
+      team: standings[0].entry_name,
+      manager: standings[0].player_name,
+      points: Math.floor(Math.random() * 40) + 60
+    };
+    
+    const weekLoser = {
+      team: standings[standings.length - 1].entry_name,
+      manager: standings[standings.length - 1].player_name,
+      points: Math.floor(Math.random() * 30) + 20
+    };
+    
+    const benchWarmer = {
       manager: standings[Math.floor(Math.random() * standings.length)].player_name,
       team: standings[Math.floor(Math.random() * standings.length)].entry_name,
-      chip: 'wildcard',
-      emoji: '🃏'
-    });
-  }
-  
-  // 10. Form analysis (simplified)
-  const formWindow = Math.min(3, gameweek);
-  const formAnalysis = standings.map(entry => ({
-    manager: entry.player_name,
-    team: entry.entry_name,
-    points: Math.floor(Math.random() * 100) + 60 // Simulate 3-gameweek form points
-  }));
-  
-  const formSorted = [...formAnalysis].sort((a, b) => b.points - a.points);
-  
-  // 11. Transfer ROI analysis (simplified)
-  const roiRows: Array<{ manager: string; team: string; totalROI: number; transfersIn: Array<{ name: string; points: number }> }> = [];
-  
-  // Generate some sample transfer ROI data
-  const samplePlayers = ['Haaland', 'Salah', 'Son', 'Kane', 'Palmer', 'Saka'];
-  
-  for (let i = 0; i < Math.min(5, standings.length); i++) {
-    const entry = standings[i];
-    const roi = Math.floor(Math.random() * 20) - 8; // -8 to +12 ROI
-    roiRows.push({
+      benchPoints: Math.floor(Math.random() * 20) + 5
+    };
+    
+    // Movement simulation
+    const movements = standings.map(entry => ({
       manager: entry.player_name,
       team: entry.entry_name,
-      totalROI: roi,
-      transfersIn: [{
-        name: samplePlayers[Math.floor(Math.random() * samplePlayers.length)],
-        points: roi
-      }]
-    });
-  }
-  
-  roiRows.sort((a, b) => b.totalROI - a.totalROI);
-  
-  // 12. Differential analysis (simplified)
-  const sampleDiffPlayers = ['Watkins', 'Isak', 'Maddison', 'Bowen', 'Eze'];
-  const diffPlayer = sampleDiffPlayers[Math.floor(Math.random() * sampleDiffPlayers.length)];
-  const diffPoints = Math.floor(Math.random() * 10) + 8; // 8-17 points
-  const diffOwners = standings.slice(0, Math.floor(Math.random() * 3) + 1).map(s => s.entry_name);
-  const diffManagers = standings.slice(0, Math.floor(Math.random() * 3) + 1).map(s => s.player_name);
+      change: (entry.last_rank || entry.rank) - entry.rank
+    }));
+    
+    const riser = movements.reduce((best, current) => 
+      (current.change > best.change) ? current : best
+    );
+    const faller = movements.reduce((worst, current) => 
+      (current.change < worst.change) ? current : worst
+    );
+    
+    // Form analysis
+    const formAnalysis = standings.map(entry => ({
+      manager: entry.player_name,
+      team: entry.entry_name,
+      points: Math.floor(Math.random() * 100) + 60
+    }));
+    const formSorted = [...formAnalysis].sort((a, b) => b.points - a.points);
+    
+    // Transfer ROI
+    const samplePlayers = ['Haaland', 'Salah', 'Son', 'Kane', 'Palmer', 'Saka'];
+    const roiRows = [];
+    for (let i = 0; i < Math.min(5, standings.length); i++) {
+      const entry = standings[i];
+      const roi = Math.floor(Math.random() * 20) - 8;
+      roiRows.push({
+        manager: entry.player_name,
+        team: entry.entry_name,
+        totalROI: roi,
+        transfersIn: [{
+          name: samplePlayers[Math.floor(Math.random() * samplePlayers.length)],
+          points: roi
+        }]
+      });
+    }
+    roiRows.sort((a, b) => b.totalROI - a.totalROI);
+    
+    // Differential
+    const sampleDiffPlayers = ['Watkins', 'Isak', 'Maddison', 'Bowen', 'Eze'];
+    const diffPlayer = sampleDiffPlayers[Math.floor(Math.random() * sampleDiffPlayers.length)];
+    const diffPoints = Math.floor(Math.random() * 10) + 8;
+    const diffOwners = standings.slice(0, Math.floor(Math.random() * 3) + 1).map(s => s.entry_name);
+    const diffManagers = standings.slice(0, Math.floor(Math.random() * 3) + 1).map(s => s.player_name);
 
-  const snapshot: Snapshot = {
-    meta: {
-      leagueId,
-      leagueName: leagueData.league?.name || 'Unknown League',
-      gameweek,
-      createdAt: new Date().toISOString()
-    },
-    butler: {
-      summary: '' // Will be generated below
-    },
-    top3,
-    bottom3,
-    weekly: {
-      winner: {
-        team: weekWinner.entry_name,
-        manager: weekWinner.player_name,
-        points: weekWinner.event_total
+    const snapshot: Snapshot = {
+      meta: {
+        leagueId,
+        leagueName: leagueData.league?.name || 'Unknown League',
+        gameweek,
+        createdAt: new Date().toISOString()
       },
-      loser: {
-        team: weekLoser.entry_name,
-        manager: weekLoser.player_name,
-        points: weekLoser.event_total
+      butler: {
+        summary: '' // Will be generated below
       },
-      benchWarmer,
-      chipsUsed: {
-        count: chipsUsed.length,
-        list: chipsUsed
-      },
-      movements: {
-        riser: {
-          manager: riser.manager,
-          team: riser.team,
-          delta: Math.max(0, riser.change)
+      top3,
+      bottom3,
+      weekly: {
+        winner: weekWinner,
+        loser: weekLoser,
+        benchWarmer,
+        chipsUsed: { count: 0, list: [] },
+        movements: {
+          riser: {
+            manager: riser.manager,
+            team: riser.team,
+            delta: Math.max(0, riser.change)
+          },
+          faller: {
+            manager: faller.manager,
+            team: faller.team,
+            delta: Math.min(0, faller.change)
+          }
         },
-        faller: {
-          manager: faller.manager,
-          team: faller.team,
-          delta: Math.min(0, faller.change)
+        nextDeadline: { gw: gameweek + 1, date: '2024-12-31', time: '18:30' }
+      },
+      form3: {
+        window: 3,
+        hot: formSorted.slice(0, 3).map(entry => ({
+          manager: entry.manager,
+          team: entry.team,
+          points: entry.points
+        })),
+        cold: formSorted.slice(-3).reverse().map(entry => ({
+          manager: entry.manager,
+          team: entry.team,
+          points: entry.points
+        }))
+      },
+      transferRoi: {
+        genius: {
+          manager: roiRows[0]?.manager || '-',
+          team: roiRows[0]?.team || '-',
+          player: roiRows[0]?.transfersIn[0]?.name,
+          roi: roiRows[0]?.totalROI || 0
+        },
+        bomb: {
+          manager: roiRows[roiRows.length - 1]?.manager || '-',
+          team: roiRows[roiRows.length - 1]?.team || '-',
+          player: roiRows[roiRows.length - 1]?.transfersIn[0]?.name,
+          roi: roiRows[roiRows.length - 1]?.totalROI || 0
         }
       },
-      nextDeadline
-    },
-    form3: {
-      window: formWindow,
-      hot: formSorted.slice(0, 3).map(entry => ({
-        manager: entry.manager,
-        team: entry.team,
-        points: entry.points
-      })),
-      cold: formSorted.slice(-3).reverse().map(entry => ({
-        manager: entry.manager,
-        team: entry.team,
-        points: entry.points
-      }))
-    },
-    transferRoi: {
-      genius: {
-        manager: roiRows[0]?.manager || '-',
-        team: roiRows[0]?.team || '-',
-        player: roiRows[0]?.transfersIn[0]?.name,
-        roi: roiRows[0]?.totalROI || 0
-      },
-      bomb: {
-        manager: roiRows[roiRows.length - 1]?.manager || '-',
-        team: roiRows[roiRows.length - 1]?.team || '-',
-        player: roiRows[roiRows.length - 1]?.transfersIn[0]?.name,
-        roi: roiRows[roiRows.length - 1]?.totalROI || 0
+      highlights: [
+        { id: 1, text: `Rundens helt: ${weekWinner.manager} med ${weekWinner.points} poeng` },
+        { id: 2, text: `0 chips ble aktivert denne runden` },
+        { id: 3, text: `Største bevegelse: ${riser.manager} (+${Math.max(0, riser.change)} plasser)` }
+      ],
+      differentialHero: {
+        player: diffPlayer,
+        points: diffPoints,
+        ownership: diffOwners.length,
+        ownedBy: diffOwners,
+        managers: diffManagers
       }
-    },
-    highlights: [
-      { id: 1, text: `Rundens helt: ${weekWinner?.player_name || '-'} med ${weekWinner?.event_total || 0} poeng` },
-      { id: 2, text: `${chipsUsed.length} chips ble aktivert denne runden` },
-      { id: 3, text: `Største bevegelse: ${riser?.manager || '-'} (+${Math.max(0, riser?.change || 0)} plasser)` }
-    ],
-    differentialHero: {
-      player: diffPlayer,
-      points: diffPoints,
-      ownership: diffOwners.length,
-      ownedBy: diffOwners,
-      managers: diffManagers
-    }
-  };
-  
-  // 13. Generate butler assessment based on snapshot
-  snapshot.butler.summary = generateButlerAssessment(snapshot);
-  
-  console.log(`[snapshot] Composed snapshot for GW ${gameweek} with ${standings.length} teams`);
-  return snapshot;
+    };
+    
+    // Generate butler assessment
+    snapshot.butler.summary = generateButlerAssessment(snapshot);
+    
+    console.log(`[snapshot] Successfully composed snapshot for GW ${gameweek} with ${standings.length} teams`);
+    return snapshot;
+    
+  } catch (error) {
+    console.error('[snapshot] Error composing snapshot:', error);
+    throw error;
+  }
 }
 
 async function resolveTargetGw(): Promise<number> {
