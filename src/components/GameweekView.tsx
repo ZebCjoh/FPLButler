@@ -141,7 +141,7 @@ const GameweekView: React.FC<GameweekViewProps> = ({ gameweekId, onBackToHome })
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch">
-                {topThree.map(({ rank, teamName, managerName, points }) => (
+                {topThree.map(({ rank, teamName, managerName, points }: { rank: number; teamName: string; managerName?: string; points: number }) => (
                   <div
                     key={rank}
                     className={`
@@ -196,7 +196,7 @@ const GameweekView: React.FC<GameweekViewProps> = ({ gameweekId, onBackToHome })
               </div>
               
               <div className="grid grid-cols-1 gap-4">
-                {bottomThree.map(({ rank, teamName, managerName, points }) => (
+                {bottomThree.map(({ rank, teamName, managerName, points }: { rank: number; teamName: string; managerName?: string; points: number }) => (
                   <div
                     key={rank}
                     className="bg-[#3D195B] border-2 border-red-500/70 rounded-xl shadow-xl p-4 flex items-center space-x-4 hover:scale-105 transition-all duration-300"
