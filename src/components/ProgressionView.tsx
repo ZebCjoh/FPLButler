@@ -358,14 +358,18 @@ const ProgressionView: React.FC<ProgressionViewProps> = ({ onBackToHome }) => {
 
         {/* Chart Container */}
         <div className="bg-[#3D195B] border-2 border-[#00E0D3]/60 rounded-2xl p-6 mb-6">
-          <div className="h-[560px] w-full">
+          <div className="relative h-[540px] w-full">
+            {/* Custom Y-axis label overlay to avoid extra reserved width */}
+            <div className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 -rotate-90 text-white/80 text-xs">
+              Tabellplassering
+            </div>
             <ResponsiveContainer width="100%" height="100%">
               <LineChart
                 data={chartData}
                 margin={{
                   top: 48,
-                  right: 64,
-                  left: isMobile ? 72 : 120,
+                  right: 80,
+                  left: 80,
                   bottom: 88,
                 }}
               >
@@ -381,7 +385,7 @@ const ProgressionView: React.FC<ProgressionViewProps> = ({ onBackToHome }) => {
                   fontSize={12}
                   domain={[1, maxRank]}
                   reversed={true}
-                  label={{ value: 'Tabellplassering', angle: -90, position: 'middle', style: { fill: '#ffffff80', textAnchor: 'middle' } }}
+                  width={isMobile ? 44 : 56}
                 />
                 <Tooltip content={<CustomTooltip />} />
                 <Legend 
