@@ -398,10 +398,12 @@ const ProgressionView: React.FC<ProgressionViewProps> = ({ onBackToHome }) => {
                       dataKey={manager.name} 
                       position="right" 
                       content={(props: any) => {
-                        const { x, y, payload, dataKey } = props;
-                        const lastGw = allGameweeks[allGameweeks.length - 1];
-
-                        if (payload.gameweek === lastGw) {
+                        try {
+                          const { x, y, payload } = props;
+                          const lastGw = allGameweeks[allGameweeks.length - 1];
+                          if (!payload || payload.gameweek !== lastGw || x == null || y == null) {
+                            return null;
+                          }
                           return (
                             <text
                               x={x}
@@ -412,11 +414,12 @@ const ProgressionView: React.FC<ProgressionViewProps> = ({ onBackToHome }) => {
                               fontSize={12}
                               textAnchor="start"
                             >
-                              {dataKey}
+                              {manager.name}
                             </text>
                           );
+                        } catch {
+                          return null;
                         }
-                        return null;
                       }}
                     />
                   </Line>
