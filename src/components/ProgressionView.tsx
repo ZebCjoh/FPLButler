@@ -358,15 +358,15 @@ const ProgressionView: React.FC<ProgressionViewProps> = ({ onBackToHome }) => {
 
         {/* Chart Container */}
         <div className="bg-[#3D195B] border-2 border-[#00E0D3]/60 rounded-2xl p-6 mb-6">
-          <div className="h-[600px] w-full">
+          <div className="h-[580px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart
                 data={chartData}
                 margin={{
                   top: 48,
-                  right: 48,
+                  right: 80,
                   left: isMobile ? 56 : 100,
-                  bottom: 120,
+                  bottom: 100,
                 }}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#ffffff20" />
@@ -386,9 +386,10 @@ const ProgressionView: React.FC<ProgressionViewProps> = ({ onBackToHome }) => {
                 <Tooltip content={<CustomTooltip />} />
                 <Legend 
                   wrapperStyle={{
-                    paddingTop: '20px',
+                    paddingTop: '15px',
                     fontSize: '12px',
                     color: '#ffffff',
+                    paddingBottom: '5px',
                   }}
                   layout="horizontal"
                   align="center"
