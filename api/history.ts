@@ -36,6 +36,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       historyData = [];
     }
 
+    // Filter out future GWs (only show up to current event)
+    try {
+      const resp = await fetch('https://fantasy.premierleague.com/api/bootstrap-static/', {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; FPL-Butler/1.0)',
+          'Accept': 'application/json',
+          'Referer': 'https://fantasy.premierleague.com/'
+        } as Record<string, string>
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        const currentId = (data.events || []).find((e: any) => e.is_current)?.id || 0;
+        historyData = (historyData || []).filter((h) => h.id <= currentId);
+        // Ensure newest first
+        historyData.sort((a, b) => b.id - a.id);
+      }
+    } catch (e) {
+      console.log('[API] bootstrap-static fetch failed, returning raw history');
+    }
+
     console.log('[API] Returning history data:', historyData.length, 'items');
     
     // Cache for 2 minutes since this can change when new summaries are generated
