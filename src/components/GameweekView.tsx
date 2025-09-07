@@ -4,6 +4,7 @@ import BottomThreeSection from './BottomThreeSection';
 import ButlerAssessment from './ButlerAssessment';
 import HighlightsSection from './HighlightsSection';
 import WeeklyStatsSection from './WeeklyStatsSection';
+import HeaderSection from './HeaderSection';
 import type { Snapshot } from '../../types/snapshot';
 import { snapshotToLegacy } from '../../types/snapshot';
 
@@ -100,66 +101,81 @@ const GameweekView: React.FC<GameweekViewProps> = ({ gameweekId, onBackToHome })
       {/* Dark overlay for readability */}
       <div className="absolute inset-0 bg-black/40"></div>
       
-      <div className="relative z-10 max-w-4xl mx-auto px-4 py-6 space-y-6">
-        {/* Header with GW number */}
-        <section className="text-center">
-          <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">
-            🏆 Gameweek {snapshot.meta.gameweek}
-          </h1>
+      <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <HeaderSection 
+          leagueName={snapshot.meta.leagueName} 
+          currentGameweek={snapshot.meta.gameweek} 
+        />
+
+        {/* Add subtitle indicating this is historical data */}
+        <section className="text-center mb-6">
           <p className="text-white/80 text-sm">
             Historisk oversikt fra denne uken
           </p>
         </section>
 
-        {/* IDENTICAL sections using snapshot data - no loading states needed */}
+        {/* Butler's Assessment Section */}
         <ButlerAssessment 
           assessment={snapshot.butler.summary}
           isLoading={false}
         />
 
-        <div className="grid md:grid-cols-2 gap-6">
-          <TopThreeSection 
-            topThree={snapshot.top3.map(t => ({
-              rank: t.rank,
-              teamName: t.team,
-              manager: t.manager,
-              points: t.points,
-            }))}
-            isLoading={false}
-          />
-          <BottomThreeSection 
-            bottomThree={snapshot.bottom3.map(b => ({
-              rank: b.rank,
-              teamName: b.team,
-              manager: b.manager,
-              points: b.points,
-            }))}
-            isLoading={false}
-          />
-        </div>
+        {/* Main Content - 2 Column Layout (IDENTICAL to homepage) */}
+        <main className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Left Column */}
+          <div className="space-y-8">
+            <TopThreeSection 
+              topThree={snapshot.top3.map(t => ({
+                rank: t.rank,
+                teamName: t.team,
+                manager: t.manager,
+                points: t.points,
+              }))}
+              isLoading={false}
+            />
 
-        <WeeklyStatsSection 
-          currentGameweek={snapshot.meta.gameweek}
-          weeklyStats={legacyData}
-          isLoading={false}
-        />
+            <BottomThreeSection 
+              bottomThree={snapshot.bottom3.map(b => ({
+                rank: b.rank,
+                teamName: b.team,
+                manager: b.manager,
+                points: b.points,
+              }))}
+              isLoading={false}
+            />
 
-        <HighlightsSection 
-          highlights={snapshot.highlights}
-          isLoading={false}
-        />
-
-        {/* Back to Home Button - ONLY DIFFERENCE */}
-        <section className="mt-8">
-          <div className="bg-[#3D195B] border-2 border-[#00E0D3]/60 rounded-xl p-4 text-center">
-            <button 
-              onClick={onBackToHome}
-              className="bg-[#00E0D3] text-[#3D195B] px-6 py-3 rounded-lg font-bold hover:bg-[#00E0D3]/80 transition-all duration-300 shadow-lg"
-            >
-              ← Tilbake til forsiden
-            </button>
+            <HighlightsSection 
+              highlights={snapshot.highlights}
+              isLoading={false}
+            />
           </div>
-        </section>
+
+          {/* Right Column - Weekly Stats */}
+          <div className="space-y-4">
+            <WeeklyStatsSection 
+              weeklyStats={legacyData}
+              currentGameweek={snapshot.meta.gameweek}
+              isLoading={false}
+            />
+
+            {/* Back to Home Button */}
+            <section className="mt-8">
+              <div className="bg-[#3D195B] border-2 border-[#00E0D3]/60 rounded-xl p-4">
+                <div className="text-center">
+                  <button 
+                    onClick={onBackToHome}
+                    className="bg-[#00E0D3] text-[#3D195B] px-6 py-3 rounded-lg font-bold hover:bg-[#00E0D3]/80 transition-all duration-300 shadow-lg w-full"
+                  >
+                    ← Tilbake til forsiden
+                  </button>
+                  <p className="text-white/70 text-xs mt-2">
+                    Gå tilbake til live gameweek data
+                  </p>
+                </div>
+              </div>
+            </section>
+          </div>
+        </main>
       </div>
     </div>
   );
