@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import TopThreeSection from './TopThreeSection';
 import BottomThreeSection from './BottomThreeSection';
 import ButlerAssessment from './ButlerAssessment';
-import SummaryDisplay from './SummaryDisplay';
 import HighlightsSection from './HighlightsSection';
 import WeeklyStatsSection from './WeeklyStatsSection';
 import type { Snapshot } from '../../types/snapshot';
@@ -105,7 +104,7 @@ const GameweekView: React.FC<GameweekViewProps> = ({ gameweekId, onBackToHome })
         {/* Header with GW number */}
         <section className="text-center">
           <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">
-            🏆 Gameweek {snapshot.gwNumber}
+            🏆 Gameweek {snapshot.meta.gameweek}
           </h1>
           <p className="text-white/80 text-sm">
             Historisk oversikt fra denne uken
@@ -114,43 +113,40 @@ const GameweekView: React.FC<GameweekViewProps> = ({ gameweekId, onBackToHome })
 
         {/* IDENTICAL sections using snapshot data - no loading states needed */}
         <ButlerAssessment 
-          currentGW={snapshot.gwNumber}
-          standings={legacyData.standings}
-          assessment={snapshot.assessment}
+          assessment={snapshot.butler.summary}
           isLoading={false}
         />
 
         <div className="grid md:grid-cols-2 gap-6">
           <TopThreeSection 
-            standings={legacyData.standings}
+            topThree={snapshot.top3.map(t => ({
+              rank: t.rank,
+              teamName: t.team,
+              manager: t.manager,
+              points: t.points,
+            }))}
             isLoading={false}
           />
           <BottomThreeSection 
-            standings={legacyData.standings}
+            bottomThree={snapshot.bottom3.map(b => ({
+              rank: b.rank,
+              teamName: b.team,
+              manager: b.manager,
+              points: b.points,
+            }))}
             isLoading={false}
           />
         </div>
 
         <WeeklyStatsSection 
-          currentGW={snapshot.gwNumber}
-          standings={legacyData.standings}
-          liveData={legacyData.weeklyStats}
+          currentGameweek={snapshot.meta.gameweek}
+          weeklyStats={legacyData}
           isLoading={false}
         />
 
         <HighlightsSection 
-          currentGW={snapshot.gwNumber}
-          standings={legacyData.standings}
-          liveData={legacyData.weeklyStats}
           highlights={snapshot.highlights}
           isLoading={false}
-        />
-
-        <SummaryDisplay 
-          currentGW={snapshot.gwNumber}
-          liveData={legacyData.weeklyStats}
-          differential={snapshot.differential}
-          isLoading={false} 
         />
 
         {/* Back to Home Button - ONLY DIFFERENCE */}
