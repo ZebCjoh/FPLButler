@@ -406,19 +406,38 @@ const ProgressionView: React.FC<ProgressionViewProps> = ({ onBackToHome }) => {
                     const MAX = isMobile ? 12 : 14;
                     return value.length > MAX ? value.slice(0, MAX - 1) + '…' : value;
                   }}
+                  payload={progressionData.managers.map((manager, index) => ({
+                    value: manager.name,
+                    type: 'line',
+                    color: colors[index],
+                    id: manager.name
+                  }))}
                 />
-                {progressionData.managers.map((manager, index) => (
-                  <Line
-                    key={manager.name}
-                    type="monotone"
-                    dataKey={manager.name}
-                    stroke={colors[index]}
-                    strokeWidth={1.5}
-                    dot={{ r: 2 }}
-                    activeDot={{ r: 4, stroke: colors[index], strokeWidth: 2 }}
-                    connectNulls={false}
-                  />
-                ))}
+                {progressionData.managers.map((manager, index) => {
+                  // Get final rank for label positioning
+                  const finalGw = Math.max(...progressionData.gameweeks);
+                  const finalRank = manager.data.find(d => d.gw === finalGw)?.rank || 1;
+                  
+                  return (
+                    <Line
+                      key={manager.name}
+                      type="monotone"
+                      dataKey={manager.name}
+                      stroke={colors[index]}
+                      strokeWidth={1.5}
+                      dot={{ r: 2 }}
+                      activeDot={{ r: 4, stroke: colors[index], strokeWidth: 2 }}
+                      connectNulls={false}
+                      label={index < 5 ? { // Only show labels for top 5 to avoid clutter
+                        position: 'right',
+                        value: manager.name.length > 12 ? manager.name.slice(0, 11) + '…' : manager.name,
+                        fill: colors[index],
+                        fontSize: 11,
+                        offset: 5
+                      } : false}
+                    />
+                  );
+                })}
               </LineChart>
             </ResponsiveContainer>
           </div>
