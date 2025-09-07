@@ -350,10 +350,10 @@ const ProgressionView: React.FC<ProgressionViewProps> = ({ onBackToHome }) => {
               <LineChart
                 data={chartData}
                 margin={{
-                  top: 20,
-                  right: 200,
-                  left: 40,
-                  bottom: 40,
+                  top: 50,
+                  right: 150,
+                  left: 50,
+                  bottom: 50,
                 }}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#ffffff20" />
@@ -374,16 +374,18 @@ const ProgressionView: React.FC<ProgressionViewProps> = ({ onBackToHome }) => {
                 <Legend 
                   wrapperStyle={{ 
                     color: '#ffffff',
-                    fontSize: '11px',
-                    paddingLeft: '10px',
-                    paddingRight: '10px',
-                    lineHeight: '1.6'
+                    fontSize: '12px',
+                    paddingLeft: '5px',
+                    paddingRight: '5px',
+                    lineHeight: '1.8',
+                    maxHeight: '400px',
+                    overflowY: 'auto'
                   }}
                   iconType="line"
                   layout="vertical"
                   align="right"
                   verticalAlign="middle"
-                  width={180}
+                  width={140}
                 />
                 {progressionData.managers.map((manager, index) => (
                   <Line
