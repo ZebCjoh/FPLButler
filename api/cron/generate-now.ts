@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { composeSnapshot } from '../../lib/snapshot';
+const { composeSnapshot } = require('../../lib/snapshot');
 
 async function resolveTargetGw(): Promise<number> {
   const resp = await fetch('https://fantasy.premierleague.com/api/bootstrap-static/', {
