@@ -406,18 +406,8 @@ const ProgressionView: React.FC<ProgressionViewProps> = ({ onBackToHome }) => {
                     const MAX = isMobile ? 12 : 14;
                     return value.length > MAX ? value.slice(0, MAX - 1) + '…' : value;
                   }}
-                  payload={progressionData.managers.map((manager, index) => ({
-                    value: manager.name,
-                    type: 'line',
-                    color: colors[index],
-                    id: manager.name
-                  }))}
                 />
                 {progressionData.managers.map((manager, index) => {
-                  // Get final rank for label positioning
-                  const finalGw = Math.max(...progressionData.gameweeks);
-                  const finalRank = manager.data.find(d => d.gw === finalGw)?.rank || 1;
-                  
                   return (
                     <Line
                       key={manager.name}
