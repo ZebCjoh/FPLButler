@@ -145,7 +145,13 @@ export const App = () => {
 
         // Helper to fetch JSON safely
         const safeJson = async (url: string) => {
-          const r = await fetch(url);
+          const r = await fetch(url, {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (compatible; FPL-Butler/1.0)',
+              'Accept': 'application/json, text/plain, */*',
+              'Referer': 'https://fantasy.premierleague.com/'
+            }
+          });
           const ct = r.headers.get('content-type') || '';
           if (!r.ok) throw new Error(`HTTP ${r.status}`);
           if (!ct.includes('application/json')) throw new Error('Non-JSON response');
@@ -167,9 +173,9 @@ export const App = () => {
             group.map(async (entryId) => {
               try {
                 const [picks, history, transfers] = await Promise.all([
-                  safeJson(`/api/entry/${entryId}/event/${currentGW}/picks`).catch(() => null),
-                  safeJson(`/api/entry/${entryId}/history`).catch(() => null),
-                  safeJson(`/api/entry/${entryId}/transfers`).catch(() => []),
+                  safeJson(`https://fantasy.premierleague.com/api/entry/${entryId}/event/${currentGW}/picks/`).catch(() => null),
+                  safeJson(`https://fantasy.premierleague.com/api/entry/${entryId}/history/`).catch(() => null),
+                  safeJson(`https://fantasy.premierleague.com/api/entry/${entryId}/transfers/`).catch(() => []),
                 ]);
                 if (picks) picksByEntry[entryId] = picks;
                 if (history) historyByEntry[entryId] = history;
