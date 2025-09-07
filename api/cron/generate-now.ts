@@ -600,41 +600,51 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // Send snapshot to ai-summary API for persistence
-    const baseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://fpl-butler.vercel.app';
+    // Prefer explicit public base URL if provided; otherwise fall back to Vercel-provided URL or custom domain
+    const baseUrl = process.env.PUBLIC_BASE_URL
+      || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://www.fplbutler.app');
     const requestBody = { snapshot };
     console.log(`[generate-now] Sending snapshot to ai-summary, size: ${JSON.stringify(requestBody).length} bytes`);
     
-    const aiResponse = await fetch(`${baseUrl}/api/ai-summary`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(requestBody)
-    });
-    
-    if (aiResponse.ok) {
-      const aiResult = await aiResponse.json();
-      console.log(`[generate-now] Successfully saved complete snapshot for GW ${gw}`);
-      return res.status(200).json({ 
-        ok: true, 
-        gameweek: gw, 
-        snapshotSize: JSON.stringify(snapshot).length,
-        aiResult,
-        preview: {
-          butler: snapshot.butler.summary.substring(0, 100) + '...',
-          winner: `${snapshot.weekly.winner.manager} (${snapshot.weekly.winner.points}p)`,
-          benchWarmer: `${snapshot.weekly.benchWarmer.manager} (${snapshot.weekly.benchWarmer.benchPoints}p)`,
-          highlights: snapshot.highlights.length,
-          transferROI: `${snapshot.transferRoi.genius.manager} (+${snapshot.transferRoi.genius.roi})`
-        }
+    try {
+      const aiResponse = await fetch(`${baseUrl}/api/ai-summary`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody)
       });
-    } else {
-      console.warn(`[generate-now] Failed to save snapshot: ${aiResponse.status}`);
+
+      if (aiResponse.ok) {
+        const aiResult = await aiResponse.json();
+        console.log(`[generate-now] Successfully saved complete snapshot for GW ${gw}`);
+        return res.status(200).json({ 
+          ok: true, 
+          gameweek: gw, 
+          snapshotSize: JSON.stringify(snapshot).length,
+          aiResult,
+          preview: {
+            butler: snapshot.butler.summary.substring(0, 100) + '...',
+            winner: `${snapshot.weekly.winner.manager} (${snapshot.weekly.winner.points}p)`,
+            benchWarmer: `${snapshot.weekly.benchWarmer.manager} (${snapshot.weekly.benchWarmer.benchPoints}p)`,
+            highlights: snapshot.highlights.length,
+            transferROI: `${snapshot.transferRoi.genius.manager} (+${snapshot.transferRoi.genius.roi})`
+          }
+        });
+      }
+
+      const text = await aiResponse.text().catch(() => '');
+      console.warn(`[generate-now] Failed to save snapshot: ${aiResponse.status} ${text}`);
       return res.status(500).json({ 
         ok: false, 
         error: 'Failed to save snapshot',
+        status: aiResponse.status,
+        body: text,
         gameweek: gw
       });
+    } catch (err: any) {
+      console.error('[generate-now] Error calling ai-summary:', err?.message || err);
+      return res.status(500).json({ ok: false, error: 'Error calling ai-summary', message: err?.message || String(err) });
     }
   } catch (error: any) {
     console.error('[generate-now] Error:', error);
