@@ -555,7 +555,7 @@ export const App = () => {
                       <option value="" disabled>Velg Gameweek</option>
                       {historyData.map((item) => (
                         <option key={item.id} value={item.url} className="bg-purple-800 text-white">
-                          {item.title}
+                          Gameweek {item.id}
                         </option>
                       ))}
                     </select>
