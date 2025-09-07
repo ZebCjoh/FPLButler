@@ -36,6 +36,18 @@ const ProgressionView: React.FC<ProgressionViewProps> = ({ onBackToHome }) => {
   const [progressionData, setProgressionData] = useState<ProgressionData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Check for mobile width
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 900);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   useEffect(() => {
     const fetchProgressionData = async () => {
@@ -350,10 +362,10 @@ const ProgressionView: React.FC<ProgressionViewProps> = ({ onBackToHome }) => {
               <LineChart
                 data={chartData}
                 margin={{
-                  top: 50,
-                  right: 150,
-                  left: 50,
-                  bottom: 50,
+                  top: 48,
+                  right: isMobile ? 24 : 240,
+                  left: 56,
+                  bottom: isMobile ? 84 : 56,
                 }}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#ffffff20" />
@@ -373,19 +385,27 @@ const ProgressionView: React.FC<ProgressionViewProps> = ({ onBackToHome }) => {
                 <Tooltip content={<CustomTooltip />} />
                 <Legend 
                   wrapperStyle={{ 
-                    color: '#ffffff',
+                    color: '#DCE7F7',
                     fontSize: '12px',
-                    paddingLeft: '5px',
-                    paddingRight: '5px',
-                    lineHeight: '1.8',
-                    maxHeight: '400px',
-                    overflowY: 'auto'
+                    lineHeight: '18px',
+                    paddingLeft: isMobile ? '4px' : '8px',
+                    paddingRight: isMobile ? '4px' : '8px',
+                    paddingTop: isMobile ? '8px' : '10px',
+                    maxHeight: isMobile ? '60px' : '400px',
+                    overflowX: isMobile ? 'auto' : 'visible',
+                    overflowY: isMobile ? 'visible' : 'auto',
+                    whiteSpace: 'nowrap',
+                    textOverflow: 'ellipsis'
                   }}
                   iconType="line"
-                  layout="vertical"
-                  align="right"
-                  verticalAlign="middle"
-                  width={140}
+                  layout={isMobile ? "horizontal" : "vertical"}
+                  align={isMobile ? "center" : "right"}
+                  verticalAlign={isMobile ? "bottom" : "middle"}
+                  width={isMobile ? undefined : 220}
+                  formatter={(value: string) => {
+                    const MAX = isMobile ? 12 : 24;
+                    return value.length > MAX ? value.slice(0, MAX - 1) + '…' : value;
+                  }}
                 />
                 {progressionData.managers.map((manager, index) => (
                   <Line
