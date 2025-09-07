@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-const { composeSnapshot } = require('../../lib/snapshot');
+import { composeSnapshot } from '../../lib/snapshot';
 
 interface FPLEvent {
   id: number;

@@ -1,6 +1,6 @@
 import { put, list } from '@vercel/blob';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-const { composeSnapshot } = require('../lib/snapshot');
+import { composeSnapshot } from '../lib/snapshot';
 import type { Snapshot } from '../types/snapshot';
 
 interface HistoryEntry {

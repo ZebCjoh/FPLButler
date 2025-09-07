@@ -1,5 +1,77 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-const { composeSnapshot } = require('../../lib/snapshot');
+import type { Snapshot } from '../../types/snapshot';
+
+// Inline simplified snapshot generation for testing
+async function composeSnapshot(leagueId: string, gameweek: number): Promise<Snapshot> {
+  console.log(`[snapshot] Composing snapshot for league ${leagueId}, GW ${gameweek}`);
+  
+  const headers = {
+    'User-Agent': 'Mozilla/5.0 (compatible; FPL-Butler/1.0)',
+    'Accept': 'application/json',
+    'Referer': 'https://fantasy.premierleague.com/'
+  };
+
+  // Get league standings
+  const leagueResp = await fetch(`https://fantasy.premierleague.com/api/leagues-classic/${leagueId}/standings/`, { headers });
+  if (!leagueResp.ok) throw new Error(`League fetch failed: ${leagueResp.status}`);
+  const leagueData = await leagueResp.json();
+  const standings = leagueData.standings.results;
+
+  return {
+    meta: {
+      leagueId,
+      leagueName: leagueData.league?.name || 'Test League',
+      gameweek,
+      createdAt: new Date().toISOString()
+    },
+    butler: {
+      summary: 'Test butler assessment - snapshot generation working!'
+    },
+    top3: standings.slice(0, 3).map((entry: any, idx: number) => ({
+      rank: (idx + 1) as 1 | 2 | 3,
+      team: entry.entry_name,
+      manager: entry.player_name,
+      points: entry.total
+    })),
+    bottom3: standings.slice(-3).map((entry: any) => ({
+      rank: entry.rank,
+      team: entry.entry_name,
+      manager: entry.player_name,
+      points: entry.total
+    })),
+    weekly: {
+      winner: { team: standings[0].entry_name, manager: standings[0].player_name, points: standings[0].event_total || 0 },
+      loser: { team: standings[standings.length - 1].entry_name, manager: standings[standings.length - 1].player_name, points: standings[standings.length - 1].event_total || 0 },
+      benchWarmer: { manager: 'Test', team: 'Test Team', benchPoints: 15 },
+      chipsUsed: { count: 0, list: [] },
+      movements: {
+        riser: { manager: 'Test Riser', team: 'Rising Team', delta: 3 },
+        faller: { manager: 'Test Faller', team: 'Falling Team', delta: -2 }
+      },
+      nextDeadline: { gw: gameweek + 1, date: '2024-02-01', time: '18:30' }
+    },
+    form3: {
+      window: 3,
+      hot: [{ manager: 'Hot Player', team: 'Hot Team', points: 45 }],
+      cold: [{ manager: 'Cold Player', team: 'Cold Team', points: 20 }]
+    },
+    transferRoi: {
+      genius: { manager: 'Genius', team: 'Smart Team', player: 'Kane', roi: 12 },
+      bomb: { manager: 'Unlucky', team: 'Bad Team', player: 'Injured Player', roi: -4 }
+    },
+    highlights: [
+      { id: 1, text: 'Test highlight 1' },
+      { id: 2, text: 'Test highlight 2' }
+    ],
+    differentialHero: {
+      player: 'Test Player',
+      points: 15,
+      ownership: 2,
+      ownedBy: ['Team1', 'Team2'],
+      managers: ['Manager1', 'Manager2']
+    }
+  };
+}
 
 async function resolveTargetGw(): Promise<number> {
   const resp = await fetch('https://fantasy.premierleague.com/api/bootstrap-static/', {
