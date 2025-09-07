@@ -280,7 +280,7 @@ const ProgressionView: React.FC<ProgressionViewProps> = ({ onBackToHome }) => {
 
         {/* Chart Container */}
         <div className="bg-[#3D195B] border-2 border-[#00E0D3]/60 rounded-2xl p-4 mb-6">
-          <div className="relative h-[450px] md:h-[540px] w-full">
+          <div className="relative h-[500px] md:h-[540px] w-full">
             {/* Custom Y-axis label overlay - positioned better for mobile */}
             <div className="pointer-events-none absolute left-1 top-1/2 -translate-y-1/2 -rotate-90 text-white/80 text-xs">
               {isMobile ? 'Rank' : 'Tabellplassering'}
@@ -292,7 +292,7 @@ const ProgressionView: React.FC<ProgressionViewProps> = ({ onBackToHome }) => {
                   top: isMobile ? 24 : 48,
                   right: isMobile ? 16 : 80,
                   left: isMobile ? 40 : 80,
-                  bottom: isMobile ? 180 : 88,
+                  bottom: isMobile ? 140 : 88,
                 }}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#ffffff20" />
@@ -317,11 +317,11 @@ const ProgressionView: React.FC<ProgressionViewProps> = ({ onBackToHome }) => {
                 <Tooltip content={<CustomTooltip />} />
                 <Legend 
                   wrapperStyle={{
-                    paddingTop: isMobile ? '8px' : '12px',
-                    fontSize: isMobile ? '10px' : '12px',
+                    paddingTop: isMobile ? '4px' : '12px',
+                    fontSize: isMobile ? '9px' : '12px',
                     color: '#ffffff',
-                    lineHeight: isMobile ? '14px' : '18px',
-                    maxHeight: isMobile ? '140px' : 'none',
+                    lineHeight: isMobile ? '12px' : '18px',
+                    maxHeight: isMobile ? '100px' : 'none',
                     overflowY: isMobile ? 'auto' : 'visible',
                   }}
                   layout="horizontal"
