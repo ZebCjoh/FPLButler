@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { getHighlights } from './logic/metrics';
 import { calculateDifferentialHero } from './logic/differentialHero';
 import GameweekView from './components/GameweekView';
+import ProgressionView from './components/ProgressionView';
 import HeaderSection from './components/HeaderSection';
 import ButlerAssessment from './components/ButlerAssessment';
 import TopThreeSection from './components/TopThreeSection';
@@ -23,7 +24,7 @@ export const App = () => {
   const [error, setError] = useState<string | null>(null);
   const [butlerAssessment, setButlerAssessment] = useState<string>('');
   const [historyData, setHistoryData] = useState<any[]>([]);
-  const [currentView, setCurrentView] = useState<'home' | 'gameweek'>('home');
+  const [currentView, setCurrentView] = useState<'home' | 'gameweek' | 'progression'>('home');
   const [selectedGameweek, setSelectedGameweek] = useState<string>('');
 
   // Dynamiske høydepunkter kommer fra metrics.getHighlights i weeklyStats.highlights
@@ -471,6 +472,15 @@ export const App = () => {
     );
   }
 
+  // Render progression view if selected
+  if (currentView === 'progression') {
+    return (
+      <ProgressionView 
+        onBackToHome={handleBackToHome}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#9B27E8] via-[#3E9BF9] to-[#00E0D3] relative overflow-hidden">
       {/* Dark overlay for readability */}
@@ -531,6 +541,23 @@ export const App = () => {
               />
 
               <InfoSection />
+
+              {/* Progression Button */}
+              <section className="mt-8">
+                <div className="bg-[#3D195B] border-2 border-[#00E0D3]/60 rounded-xl p-4">
+                  <div className="text-center">
+                    <button 
+                      onClick={() => setCurrentView('progression')}
+                      className="bg-[#00E0D3] text-[#3D195B] px-6 py-3 rounded-lg font-bold hover:bg-[#00E0D3]/80 transition-all duration-300 shadow-lg w-full"
+                    >
+                      📈 Se utvikling i tabellen
+                    </button>
+                    <p className="text-white/70 text-xs mt-2">
+                      Følg hvordan alle managerne har beveget seg over tid
+                    </p>
+                  </div>
+                </div>
+              </section>
 
               {/* History Dropdown */}
               <section className="mt-8">
