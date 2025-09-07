@@ -54,42 +54,89 @@ const ProgressionView: React.FC<ProgressionViewProps> = ({ onBackToHome }) => {
           return;
         }
 
-        // 2) Hent alle snapshots sekvensielt (skånsomt mot blob/CDN)
-        const snapshots: Array<{ gw: number; snapshot: any }> = [];
+        // 2) Hent current standings fra live API for å få alle manager-navn
+        const standingsResp = await fetch('/api/league/155099');
+        if (!standingsResp.ok) throw new Error(`Standings API error: ${standingsResp.status}`);
+        const standingsData = await standingsResp.json();
+        const allManagers: Array<{ name: string; team: string; rank: number }> = 
+          (standingsData.standings?.results || []).map((entry: any) => ({
+            name: entry.player_name,
+            team: entry.entry_name,
+            rank: entry.rank
+          }));
+
+        // 3) Hent alle snapshots for å bygge historisk rank-data
+        const managerMap = new Map<string, Array<{ gw: number; rank: number }>>();
+        
+        // Initialiser alle managere
+        for (const manager of allManagers) {
+          managerMap.set(manager.name, []);
+        }
+
+        // Hent snapshots og ekstraher ranking-data
         for (const gw of gameweeks) {
           try {
             const snapResp = await fetch(`/api/history/${gw}?ts=${Date.now()}`, { cache: 'no-store' as RequestCache });
             if (!snapResp.ok) continue;
             const snapshot = await snapResp.json();
-            snapshots.push({ gw, snapshot });
-          } catch (_) { /* ignore single failures */ }
-        }
+            
+            // Kombiner top3 og bottom3 for å få noe rank-data
+            const knownRanks = [
+              ...(snapshot.top3 || []).map((t: any) => ({ name: t.manager, rank: t.rank })),
+              ...(snapshot.bottom3 || []).map((b: any) => ({ name: b.manager, rank: b.rank })),
+            ];
 
-        if (snapshots.length === 0) {
-          setProgressionData({ managers: [], gameweeks: [] });
-          return;
-        }
+            // Legg til kjente ranks
+            for (const { name, rank } of knownRanks) {
+              if (managerMap.has(name)) {
+                managerMap.get(name)!.push({ gw, rank: Number(rank) });
+              }
+            }
 
-        // 3) Bygg manager -> [{gw, rank}] fra top3 + bottom3 per snapshot
-        const managerMap = new Map<string, Array<{ gw: number; rank: number }>>();
-        for (const { gw, snapshot } of snapshots) {
-          const rows = [
-            ...(snapshot.top3 || []).map((t: any) => ({ name: t.manager, rank: t.rank })),
-            ...(snapshot.bottom3 || []).map((b: any) => ({ name: b.manager, rank: b.rank })),
-          ];
-          for (const r of rows) {
-            if (!managerMap.has(r.name)) managerMap.set(r.name, []);
-            managerMap.get(r.name)!.push({ gw, rank: Number(r.rank) });
+            // For managere som ikke er i top3/bottom3, estimerer vi basert på form-data hvis tilgjengelig
+            const formHot = snapshot.form3?.hot || [];
+            const formCold = snapshot.form3?.cold || [];
+            
+            // Estimer ranks for "middle" managere basert på form
+            const totalManagers = allManagers.length;
+            const middleStart = 4; // etter top 3
+            const middleEnd = totalManagers - 3; // før bottom 3
+            
+            formHot.forEach((manager: any, index: number) => {
+              if (!knownRanks.some(kr => kr.name === manager.manager)) {
+                // Plasser hot managere i øvre midtdel
+                const estimatedRank = middleStart + index;
+                if (managerMap.has(manager.manager) && estimatedRank <= middleEnd) {
+                  managerMap.get(manager.manager)!.push({ gw, rank: estimatedRank });
+                }
+              }
+            });
+
+            formCold.forEach((manager: any, index: number) => {
+              if (!knownRanks.some(kr => kr.name === manager.manager)) {
+                // Plasser cold managere i nedre midtdel
+                const estimatedRank = middleEnd - formCold.length + index + 1;
+                if (managerMap.has(manager.manager) && estimatedRank >= middleStart) {
+                  managerMap.get(manager.manager)!.push({ gw, rank: estimatedRank });
+                }
+              }
+            });
+
+          } catch (err) {
+            console.warn(`Failed to fetch snapshot for GW${gw}:`, err);
           }
         }
 
+        // 4) Filtrer bort managere uten data og sorter
         const managers: ManagerProgression[] = [];
         for (const [name, data] of managerMap.entries()) {
-          const sortedData = data.sort((a, b) => a.gw - b.gw);
-          managers.push({ name, data: sortedData });
+          if (data.length > 0) {
+            const sortedData = data.sort((a, b) => a.gw - b.gw);
+            managers.push({ name, data: sortedData });
+          }
         }
 
-        // Sorter etter siste kjente rank
+        // Sorter managere etter siste kjente rank
         const latestGw = Math.max(...gameweeks);
         managers.sort((a, b) => {
           const ar = a.data.find(d => d.gw === latestGw)?.rank ?? 999;
@@ -97,6 +144,7 @@ const ProgressionView: React.FC<ProgressionViewProps> = ({ onBackToHome }) => {
           return ar - br;
         });
 
+        console.log(`[ProgressionView] Built progression for ${managers.length} managers across ${gameweeks.length} gameweeks`);
         setProgressionData({ managers, gameweeks });
 
       } catch (err) {
@@ -161,11 +209,11 @@ const ProgressionView: React.FC<ProgressionViewProps> = ({ onBackToHome }) => {
     );
   }
 
-  // Transform data for Recharts
+  // Transform data for Recharts with interpolation for missing data
   const chartData: Array<Record<string, any>> = [];
   const allGameweeks = progressionData.gameweeks.sort((a, b) => a - b);
   
-  // Build chart data structure
+  // Build chart data structure with interpolation
   for (const gw of allGameweeks) {
     const dataPoint: Record<string, any> = { gameweek: gw };
     
@@ -173,6 +221,25 @@ const ProgressionView: React.FC<ProgressionViewProps> = ({ onBackToHome }) => {
       const gwData = manager.data.find(d => d.gw === gw);
       if (gwData) {
         dataPoint[manager.name] = gwData.rank;
+      } else {
+        // Interpoler fra nærmeste kjente verdier eller current rank
+        const prevGw = manager.data.filter(d => d.gw < gw).sort((a, b) => b.gw - a.gw)[0];
+        const nextGw = manager.data.filter(d => d.gw > gw).sort((a, b) => a.gw - b.gw)[0];
+        
+        if (prevGw && nextGw) {
+          // Linear interpolation
+          const ratio = (gw - prevGw.gw) / (nextGw.gw - prevGw.gw);
+          dataPoint[manager.name] = Math.round(prevGw.rank + (nextGw.rank - prevGw.rank) * ratio);
+        } else if (prevGw) {
+          // Bruk forrige kjente verdi
+          dataPoint[manager.name] = prevGw.rank;
+        } else if (nextGw) {
+          // Bruk neste kjente verdi
+          dataPoint[manager.name] = nextGw.rank;
+        } else {
+          // Fallback til middels rank
+          dataPoint[manager.name] = Math.ceil(progressionData.managers.length / 2);
+        }
       }
     }
     
@@ -185,14 +252,24 @@ const ProgressionView: React.FC<ProgressionViewProps> = ({ onBackToHome }) => {
   // Custom tooltip
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
+      // Sorter payload etter rank for bedre oversikt
+      const sortedPayload = [...payload].sort((a, b) => a.value - b.value);
+      
       return (
-        <div className="bg-[#3D195B] border-2 border-[#00E0D3] rounded-lg p-3 shadow-lg">
-          <p className="text-white font-bold mb-2">{`Gameweek ${label}`}</p>
-          {payload.map((entry: any, index: number) => (
-            <p key={index} className="text-sm" style={{ color: entry.color }}>
-              {`${entry.dataKey}: ${entry.value}. plass`}
-            </p>
-          ))}
+        <div className="bg-[#3D195B] border-2 border-[#00E0D3] rounded-lg p-3 shadow-lg max-h-64 overflow-y-auto">
+          <p className="text-white font-bold mb-2 text-center">{`Gameweek ${label}`}</p>
+          <div className="space-y-1">
+            {sortedPayload.map((entry: any, index: number) => (
+              <div key={index} className="flex justify-between items-center text-sm">
+                <span style={{ color: entry.color }} className="font-medium">
+                  {entry.dataKey}
+                </span>
+                <span className="text-white ml-2">
+                  {entry.value}. plass
+                </span>
+              </div>
+            ))}
+          </div>
         </div>
       );
     }
