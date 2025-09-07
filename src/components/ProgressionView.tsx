@@ -363,7 +363,7 @@ const ProgressionView: React.FC<ProgressionViewProps> = ({ onBackToHome }) => {
                 data={chartData}
                 margin={{
                   top: 48,
-                  right: isMobile ? 24 : 120,
+                  right: isMobile ? 120 : 200,
                   left: isMobile ? 56 : 100,
                   bottom: isMobile ? 84 : 56,
                 }}
@@ -383,51 +383,47 @@ const ProgressionView: React.FC<ProgressionViewProps> = ({ onBackToHome }) => {
                   label={{ value: 'Tabellplassering', angle: -90, position: 'middle', style: { fill: '#ffffff80', textAnchor: 'middle' } }}
                 />
                 <Tooltip content={<CustomTooltip />} />
-                <Legend 
-                  wrapperStyle={{ 
-                    color: '#DCE7F7',
-                    fontSize: '12px',
-                    lineHeight: '18px',
-                    paddingLeft: isMobile ? '4px' : '2px',
-                    paddingRight: isMobile ? '4px' : '2px',
-                    paddingTop: isMobile ? '8px' : '10px',
-                    maxHeight: isMobile ? '60px' : '400px',
-                    overflowX: isMobile ? 'auto' : 'visible',
-                    overflowY: isMobile ? 'visible' : 'auto',
-                    whiteSpace: 'nowrap',
-                    textOverflow: 'ellipsis'
-                  }}
-                  iconType="line"
-                  layout={isMobile ? "horizontal" : "vertical"}
-                  align={isMobile ? "center" : "right"}
-                  verticalAlign={isMobile ? "bottom" : "middle"}
-                  width={isMobile ? undefined : 110}
-                  formatter={(value: string) => {
-                    const MAX = isMobile ? 12 : 14;
-                    return value.length > MAX ? value.slice(0, MAX - 1) + '…' : value;
-                  }}
-                />
-                {progressionData.managers.map((manager, index) => {
-                  return (
-                    <Line
-                      key={manager.name}
-                      type="monotone"
-                      dataKey={manager.name}
-                      stroke={colors[index]}
-                      strokeWidth={1.5}
-                      dot={{ r: 2 }}
-                      activeDot={{ r: 4, stroke: colors[index], strokeWidth: 2 }}
-                      connectNulls={false}
-                      label={index < 5 ? { // Only show labels for top 5 to avoid clutter
-                        position: 'right',
-                        value: manager.name.length > 12 ? manager.name.slice(0, 11) + '…' : manager.name,
-                        fill: colors[index],
-                        fontSize: 11,
-                        offset: 5
-                      } : false}
-                    />
-                  );
-                })}
+                {progressionData.managers.map((manager, index) => (
+                  <Line
+                    key={manager.name}
+                    type="monotone"
+                    dataKey={manager.name}
+                    stroke={colors[index]}
+                    strokeWidth={1.5}
+                    dot={false}
+                    activeDot={{ r: 4, stroke: colors[index], strokeWidth: 2 }}
+                    connectNulls={false}
+                  />
+                ))}
+                
+                {/* Custom labels at the end of each line */}
+                <g className="line-labels">
+                  {progressionData.managers.map((manager, index) => {
+                    const lastGw = Math.max(...progressionData.gameweeks);
+                    const lastRank = manager.data.find(d => d.gw === lastGw)?.rank || 1;
+                    
+                    // Calculate position relative to chart area
+                    const chartWidth = 800; // Approximate chart width
+                    const chartHeight = 400; // Approximate chart height
+                    const xPos = chartWidth - 50; // Position near right edge
+                    const yPos = ((lastRank - 1) / (maxRank - 1)) * chartHeight + 48; // Scale rank to chart height
+                    
+                    return (
+                      <text
+                        key={`label-${manager.name}`}
+                        x={xPos}
+                        y={yPos}
+                        fill={colors[index]}
+                        fontSize="12"
+                        textAnchor="start"
+                        dominantBaseline="middle"
+                        style={{ fontWeight: '500' }}
+                      >
+                        {manager.name.length > 16 ? manager.name.slice(0, 15) + '…' : manager.name}
+                      </text>
+                    );
+                  })}
+                </g>
               </LineChart>
             </ResponsiveContainer>
           </div>
