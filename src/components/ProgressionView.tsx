@@ -380,7 +380,7 @@ const ProgressionView: React.FC<ProgressionViewProps> = ({ onBackToHome }) => {
                   fontSize={12}
                   domain={[1, maxRank]}
                   reversed={true}
-                  label={{ value: 'Tabellplassering', angle: -90, position: 'insideLeft', style: { fill: '#ffffff80' } }}
+                  label={{ value: 'Tabellplassering', angle: -90, position: 'middle', style: { fill: '#ffffff80', textAnchor: 'middle' } }}
                 />
                 <Tooltip content={<CustomTooltip />} />
                 <Legend 
