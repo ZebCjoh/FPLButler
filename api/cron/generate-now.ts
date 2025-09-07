@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import type { Snapshot } from '../../types/snapshot';
-import { calculateDifferentialHero } from '../_lib/differentialHero';
+// ESM in Vercel serverless requires explicit .js extension at runtime
+import { calculateDifferentialHero } from '../_lib/differentialHero.js';
 
 interface FPLElement {
   id: number;
