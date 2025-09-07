@@ -202,11 +202,15 @@ async function composeSnapshot(leagueId: string, gameweek: number): Promise<Snap
       throw new Error('No standings data found');
     }
     
-    // 3. Live gameweek data for player points
+    // 3. Live gameweek data for player points (and goals/assists for highlights)
     const liveData: any = await fetchFPL(`https://fantasy.premierleague.com/api/event/${gameweek}/live/`);
     const pointsByElement: Record<number, number> = {};
+    const goalsByElement: Record<number, number> = {};
+    const assistsByElement: Record<number, number> = {};
     (liveData.elements || []).forEach((e: any) => {
       pointsByElement[e.id] = e.stats.total_points;
+      goalsByElement[e.id] = e.stats?.goals_scored ?? 0;
+      assistsByElement[e.id] = e.stats?.assists ?? 0;
     });
     
     // 4. Basic standings data
@@ -217,8 +221,9 @@ async function composeSnapshot(leagueId: string, gameweek: number): Promise<Snap
       points: entry.total
     }));
     
-    const bottom3 = standings.slice(-3).reverse().map(entry => ({
-      rank: entry.rank,
+    const bottomTail = standings.slice(-3);
+    const bottom3 = bottomTail.map((entry, index) => ({
+      rank: (standings.length - 2 + index),
       team: entry.entry_name,
       manager: entry.player_name,
       points: entry.total
@@ -383,8 +388,8 @@ async function composeSnapshot(leagueId: string, gameweek: number): Promise<Snap
     let diffPoints = 0;
     let diffOwners: string[] = [];
     let diffManagers: string[] = [];
-    if (diffCandidate) {
-      const dc = diffCandidate;
+    if (diffCandidate !== null) {
+      const dc: { id: number; owners: number; points: number } = diffCandidate as { id: number; owners: number; points: number };
       diffPlayer = elementIdToName[dc.id] || `#${dc.id}`;
       diffPoints = dc.points;
       standings.forEach((row: any) => {
@@ -425,7 +430,7 @@ async function composeSnapshot(leagueId: string, gameweek: number): Promise<Snap
         winner: weekWinner,
         loser: weekLoser,
         benchWarmer,
-        chipsUsed: { count: 0, list: [] }, // Simplified for now
+        chipsUsed: { count: chipsUsed.length, list: chipsUsed },
         movements: {
           riser: {
             manager: riser.manager,
@@ -467,11 +472,68 @@ async function composeSnapshot(leagueId: string, gameweek: number): Promise<Snap
           roi: roiRows[roiRows.length - 1]?.totalROI || 0
         }
       },
-      highlights: [
-        { id: 1, text: `Rundens helt: ${weekWinner.manager} med ${weekWinner.points} poeng` },
-        { id: 2, text: `Benkesliter: ${benchWarmer.manager} med ${benchWarmer.benchPoints} poeng på benken` },
-        { id: 3, text: `Største bevegelse: ${riser.manager} (+${Math.max(0, riser.change)} plasser)` }
-      ],
+      highlights: (() => {
+        // Build highlights identically to homepage metrics
+        // (1) Rundens helt: within chosen league picks
+        const chosenElements = new Set<number>();
+        standings.forEach((row: any) => {
+          const entryId = row.entry;
+          const picks = picksByEntry[entryId]?.picks || [];
+          picks.forEach((p: any) => chosenElements.add(p.element));
+        });
+        let heroId = -1; let heroPts = -1;
+        chosenElements.forEach((id) => {
+          const pts = pointsByElement[id] ?? 0;
+          if (pts > heroPts) { heroId = id; heroPts = pts; }
+        });
+        const heroGoals = heroId > 0 ? (goalsByElement[heroId] ?? 0) : 0;
+        const heroAssists = heroId > 0 ? (assistsByElement[heroId] ?? 0) : 0;
+        const heroName = heroId > 0 ? (elementIdToName[heroId] || `#${heroId}`) : '-';
+        const heroLine = (heroGoals || heroAssists)
+          ? `Rundens helt: ${heroName} med ${heroGoals} mål og ${heroAssists} assist`
+          : `Rundens helt: ${heroName} med ${heroPts} poeng`;
+
+        // (2) Transfer highlight (using picks.entry_history to avoid extra calls)
+        let totalTransfers = 0;
+        let biggestGambler = { name: '', cost: 0 } as { name: string; cost: number };
+        standings.forEach((row: any) => {
+          const entryId = row.entry;
+          const picks = picksByEntry[entryId];
+          const transfers = Number(picks?.entry_history?.event_transfers || 0);
+          const transfersCost = Number(picks?.entry_history?.event_transfers_cost || 0);
+          totalTransfers += transfers;
+          if (transfersCost > biggestGambler.cost) {
+            biggestGambler = { name: row.player_name || row.entry_name, cost: transfersCost };
+          }
+        });
+        let transferLine = `Totalt ble det gjort ${totalTransfers} bytter i ligaen denne runden.`;
+        if (biggestGambler.cost > 0) {
+          transferLine += ` Største gambler: ${biggestGambler.name} med -${biggestGambler.cost} poeng i hits.`;
+        }
+
+        // (3) Kapteinsvalg
+        const captainCount: Record<number, number> = {};
+        standings.forEach((row: any) => {
+          const entryId = row.entry;
+          const picks = picksByEntry[entryId]?.picks || [];
+          const cap = picks.find((p: any) => p.is_captain);
+          if (cap) captainCount[cap.element] = (captainCount[cap.element] || 0) + 1;
+        });
+        let topCapId = -1; let topCapCount = 0;
+        Object.entries(captainCount).forEach(([idStr, count]) => {
+          const id = Number(idStr);
+          if ((count as number) > topCapCount) { topCapId = id; topCapCount = count as number; }
+        });
+        const capName = topCapId > 0 ? (elementIdToName[topCapId] || `#${topCapId}`) : '-';
+        const capPct = standings.length ? Math.round((topCapCount / standings.length) * 100) : 0;
+        const captainLine = `Kapteinsvalg: ${capPct}% ga båndet til ${capName}.`;
+
+        return [
+          { id: 1, text: heroLine },
+          { id: 2, text: transferLine },
+          { id: 3, text: captainLine },
+        ];
+      })(),
       differentialHero: {
         player: diffPlayer,
         points: diffPoints,
