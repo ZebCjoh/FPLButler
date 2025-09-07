@@ -333,13 +333,18 @@ export async function composeSnapshot(leagueId: string, gameweek: number): Promi
     }
   });
   
+  let diffPlayerName = '-';
+  let diffPointsValue = 0;
   const diffOwners: string[] = [];
   const diffManagers: string[] = [];
-  if (diffCandidate) {
+  if (diffCandidate !== null) {
+    const dc = diffCandidate as { id: number; owners: number; points: number };
+    diffPlayerName = elementIdToName[dc.id] || `#${dc.id}`;
+    diffPointsValue = dc.points;
     standings.forEach((row) => {
       const entryId = row.entry;
       const picks = picksByEntry[entryId]?.picks || [];
-      if (picks.some((p: any) => p.element === diffCandidate!.id)) {
+      if (picks.some((p: any) => p.element === dc.id)) {
         diffOwners.push(row.entry_name);
         diffManagers.push(row.player_name);
       }
@@ -386,8 +391,8 @@ export async function composeSnapshot(leagueId: string, gameweek: number): Promi
   };
   
   // 11. Build snapshot
-  const diffPlayer: string = diffCandidate ? (elementIdToName[diffCandidate.id] || `#${diffCandidate.id}`) : '-';
-  const diffPoints: number = diffCandidate ? diffCandidate.points : 0;
+  const diffPlayer: string = diffPlayerName;
+  const diffPoints: number = diffPointsValue;
 
   const snapshot: Snapshot = {
     meta: {

@@ -97,7 +97,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       } else {
         // Generate new snapshot
         const gameweek = req.body?.gameweek;
-        const leagueId = req.body?.leagueId || '155099';
+        const leagueId = req.body?.leagueId || '155099'; // eslint-disable-line @typescript-eslint/no-unused-vars
         
         if (!gameweek) {
           return res.status(400).json({ error: 'Missing gameweek in request body' });

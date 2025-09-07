@@ -42,21 +42,65 @@ const ProgressionView: React.FC<ProgressionViewProps> = ({ onBackToHome }) => {
       try {
         setLoading(true);
         setError(null);
-        
-        const response = await fetch(`/api/progression?ts=${Date.now()}`, { 
-          cache: 'no-store' as RequestCache 
-        });
-        
-        if (!response.ok) {
-          throw new Error(`API error: ${response.status}`);
+
+        // 1) Hent historikklisten for å få tilgjengelige gameweeks
+        const historyResp = await fetch(`/api/history?ts=${Date.now()}`, { cache: 'no-store' as RequestCache });
+        if (!historyResp.ok) throw new Error(`History API error: ${historyResp.status}`);
+        const history = await historyResp.json();
+        const gameweeks: number[] = (history || []).map((h: any) => Number(h.id)).filter((x: number) => Number.isFinite(x)).sort((a: number, b: number) => a - b);
+
+        if (gameweeks.length === 0) {
+          setProgressionData({ managers: [], gameweeks: [] });
+          return;
         }
-        
-        const data: ProgressionData = await response.json();
-        console.log('[ProgressionView] Loaded progression data:', data);
-        setProgressionData(data);
-        
+
+        // 2) Hent alle snapshots sekvensielt (skånsomt mot blob/CDN)
+        const snapshots: Array<{ gw: number; snapshot: any }> = [];
+        for (const gw of gameweeks) {
+          try {
+            const snapResp = await fetch(`/api/history/${gw}?ts=${Date.now()}`, { cache: 'no-store' as RequestCache });
+            if (!snapResp.ok) continue;
+            const snapshot = await snapResp.json();
+            snapshots.push({ gw, snapshot });
+          } catch (_) { /* ignore single failures */ }
+        }
+
+        if (snapshots.length === 0) {
+          setProgressionData({ managers: [], gameweeks: [] });
+          return;
+        }
+
+        // 3) Bygg manager -> [{gw, rank}] fra top3 + bottom3 per snapshot
+        const managerMap = new Map<string, Array<{ gw: number; rank: number }>>();
+        for (const { gw, snapshot } of snapshots) {
+          const rows = [
+            ...(snapshot.top3 || []).map((t: any) => ({ name: t.manager, rank: t.rank })),
+            ...(snapshot.bottom3 || []).map((b: any) => ({ name: b.manager, rank: b.rank })),
+          ];
+          for (const r of rows) {
+            if (!managerMap.has(r.name)) managerMap.set(r.name, []);
+            managerMap.get(r.name)!.push({ gw, rank: Number(r.rank) });
+          }
+        }
+
+        const managers: ManagerProgression[] = [];
+        for (const [name, data] of managerMap.entries()) {
+          const sortedData = data.sort((a, b) => a.gw - b.gw);
+          managers.push({ name, data: sortedData });
+        }
+
+        // Sorter etter siste kjente rank
+        const latestGw = Math.max(...gameweeks);
+        managers.sort((a, b) => {
+          const ar = a.data.find(d => d.gw === latestGw)?.rank ?? 999;
+          const br = b.data.find(d => d.gw === latestGw)?.rank ?? 999;
+          return ar - br;
+        });
+
+        setProgressionData({ managers, gameweeks });
+
       } catch (err) {
-        console.error('[ProgressionView] Error fetching progression data:', err);
+        console.error('[ProgressionView] Error building progression:', err);
         setError('Kunne ikke hente utviklingsdata. Prøv igjen senere.');
       } finally {
         setLoading(false);
