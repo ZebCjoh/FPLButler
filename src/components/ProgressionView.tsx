@@ -242,16 +242,16 @@ const ProgressionView: React.FC<ProgressionViewProps> = ({ onBackToHome }) => {
       const sortedPayload = [...payload].sort((a, b) => a.value - b.value);
       
       return (
-        <div className="bg-[#3D195B] border-2 border-[#00E0D3] rounded-lg p-3 shadow-lg max-h-64 overflow-y-auto">
-          <p className="text-white font-bold mb-2 text-center">{`Gameweek ${label}`}</p>
-          <div className="space-y-1">
+        <div className="bg-[#3D195B] border-2 border-[#00E0D3] rounded-lg p-2 shadow-lg max-h-80 overflow-y-auto max-w-xs">
+          <p className="text-white font-bold mb-2 text-center text-sm">{`Gameweek ${label}`}</p>
+          <div className="space-y-0.5">
             {sortedPayload.map((entry: any, index: number) => (
-              <div key={index} className="flex justify-between items-center text-sm">
-                <span style={{ color: entry.color }} className="font-medium">
+              <div key={index} className="flex justify-between items-center text-xs">
+                <span style={{ color: entry.color }} className="font-medium truncate mr-2 flex-1">
                   {entry.dataKey}
                 </span>
-                <span className="text-white ml-2">
-                  {entry.value}. plass
+                <span className="text-white text-xs font-medium">
+                  {entry.value}.
                 </span>
               </div>
             ))}
