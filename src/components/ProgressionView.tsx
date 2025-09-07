@@ -376,14 +376,14 @@ const ProgressionView: React.FC<ProgressionViewProps> = ({ onBackToHome }) => {
                     color: '#ffffff',
                     fontSize: '11px',
                     paddingLeft: '10px',
-                    paddingRight: '10px'
+                    paddingRight: '10px',
+                    lineHeight: '1.6'
                   }}
                   iconType="line"
                   layout="vertical"
                   align="right"
                   verticalAlign="middle"
                   width={180}
-                  itemGap={14}
                 />
                 {progressionData.managers.map((manager, index) => (
                   <Line
