@@ -364,9 +364,9 @@ const ProgressionView: React.FC<ProgressionViewProps> = ({ onBackToHome }) => {
                 data={chartData}
                 margin={{
                   top: 48,
-                  right: 80,
-                  left: isMobile ? 56 : 100,
-                  bottom: 100,
+                  right: 85,
+                  left: isMobile ? 60 : 105,
+                  bottom: 95,
                 }}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#ffffff20" />
