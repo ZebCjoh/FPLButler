@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LabelList } from 'recharts';
 
 interface ManagerProgression {
   name: string;
@@ -390,40 +390,35 @@ const ProgressionView: React.FC<ProgressionViewProps> = ({ onBackToHome }) => {
                     dataKey={manager.name}
                     stroke={colors[index]}
                     strokeWidth={1.5}
-                    dot={false}
-                    activeDot={{ r: 4, stroke: colors[index], strokeWidth: 2 }}
+                    dot={{ r: 2 }}
+                    activeDot={{ r: 6, strokeWidth: 2 }}
                     connectNulls={false}
-                  />
+                  >
+                    <LabelList 
+                      dataKey={manager.name} 
+                      position="right" 
+                      content={(props: any) => {
+                        const { x, y, index: pointIndex, dataKey } = props;
+                        if (pointIndex === chartData.length - 1) {
+                          return (
+                            <text
+                              x={x}
+                              y={y}
+                              dx={10}
+                              dy={4}
+                              fill={colors[index]}
+                              fontSize={12}
+                              textAnchor="start"
+                            >
+                              {dataKey}
+                            </text>
+                          );
+                        }
+                        return null;
+                      }}
+                    />
+                  </Line>
                 ))}
-                
-                {/* Custom labels at the end of each line */}
-                <g className="line-labels">
-                  {progressionData.managers.map((manager, index) => {
-                    const lastGw = Math.max(...progressionData.gameweeks);
-                    const lastRank = manager.data.find(d => d.gw === lastGw)?.rank || 1;
-                    
-                    // Calculate position relative to chart area
-                    const chartWidth = 800; // Approximate chart width
-                    const chartHeight = 400; // Approximate chart height
-                    const xPos = chartWidth - 50; // Position near right edge
-                    const yPos = ((lastRank - 1) / (maxRank - 1)) * chartHeight + 48; // Scale rank to chart height
-                    
-                    return (
-                      <text
-                        key={`label-${manager.name}`}
-                        x={xPos}
-                        y={yPos}
-                        fill={colors[index]}
-                        fontSize="12"
-                        textAnchor="start"
-                        dominantBaseline="middle"
-                        style={{ fontWeight: '500' }}
-                      >
-                        {manager.name.length > 16 ? manager.name.slice(0, 15) + '…' : manager.name}
-                      </text>
-                    );
-                  })}
-                </g>
               </LineChart>
             </ResponsiveContainer>
           </div>
