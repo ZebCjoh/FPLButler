@@ -363,7 +363,7 @@ const ProgressionView: React.FC<ProgressionViewProps> = ({ onBackToHome }) => {
                 data={chartData}
                 margin={{
                   top: 48,
-                  right: isMobile ? 24 : 180,
+                  right: isMobile ? 24 : 140,
                   left: 56,
                   bottom: isMobile ? 84 : 56,
                 }}
@@ -401,9 +401,9 @@ const ProgressionView: React.FC<ProgressionViewProps> = ({ onBackToHome }) => {
                   layout={isMobile ? "horizontal" : "vertical"}
                   align={isMobile ? "center" : "right"}
                   verticalAlign={isMobile ? "bottom" : "middle"}
-                  width={isMobile ? undefined : 170}
+                  width={isMobile ? undefined : 130}
                   formatter={(value: string) => {
-                    const MAX = isMobile ? 12 : 20;
+                    const MAX = isMobile ? 12 : 16;
                     return value.length > MAX ? value.slice(0, MAX - 1) + '…' : value;
                   }}
                 />
