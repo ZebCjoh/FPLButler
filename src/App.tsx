@@ -578,7 +578,9 @@ export const App = () => {
                       }}
                     >
                       <option value="" disabled>Velg Gameweek</option>
-                      {historyData.map((item) => (
+                      {historyData
+                        .filter((item) => item.id > 2) // Skjul GW1 og GW2 som har kunstige data
+                        .map((item) => (
                         <option key={item.id} value={item.url} className="bg-purple-800 text-white">
                           Gameweek {item.id}
                         </option>
