@@ -1,12 +1,6 @@
 import { list } from '@vercel/blob';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-
-interface GameweekData {
-  id: number;
-  gameweek: number;
-  summary: string;
-  createdAt: string;
-}
+import type { Snapshot } from '../../types/snapshot';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') {
@@ -25,36 +19,35 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    console.log(`[API] Fetching gameweek ${id} from Vercel Blob...`);
+    console.log(`[API] Fetching complete snapshot for gameweek ${id} from Vercel Blob...`);
     
-    // Try to get gw-[id].json from blob (robust listing)
+    // Get gw-[id].json from blob (robust listing)
     const filename = `gw-${id}.json`;
-    // List by common prefix to avoid exact-match listing edge-cases
     const { blobs } = await list({ token, prefix: 'gw-' as any });
     const gameweekBlob = (blobs || []).find((b: any) => b.pathname === filename);
     
     if (!gameweekBlob) {
-      console.log(`[API] No data found for gameweek ${id}`);
+      console.log(`[API] No snapshot found for gameweek ${id}`);
       return res.status(404).json({ 
         error: 'Gameweek not found',
-        message: `No data available for gameweek ${id}` 
+        message: `No snapshot available for gameweek ${id}` 
       });
     }
 
-    console.log(`[API] Found ${filename} in blob, fetching...`);
+    console.log(`[API] Found ${filename} in blob, fetching complete snapshot...`);
     const response = await fetch(`${gameweekBlob.url}?ts=${Date.now()}`, { cache: 'no-store' });
-    const gameweekData: GameweekData = await response.json();
+    const snapshot: Snapshot = await response.json();
 
-    console.log(`[API] Returning gameweek ${id} data`);
+    console.log(`[API] Returning complete snapshot for gameweek ${id}`);
     
-    // Cache for 10 minutes since historical data doesn't change often
+    // Cache for 10 minutes since historical snapshots don't change
     res.setHeader('Cache-Control', 's-maxage=600, stale-while-revalidate=300');
-    return res.status(200).json(gameweekData);
+    return res.status(200).json(snapshot);
 
   } catch (error) {
     console.error(`[API] Error fetching gameweek ${id}:`, error);
     return res.status(500).json({ 
-      error: 'Failed to fetch gameweek data', 
+      error: 'Failed to fetch gameweek snapshot', 
       message: error instanceof Error ? error.message : 'Unknown error' 
     });
   }

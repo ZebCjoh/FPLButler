@@ -6,6 +6,8 @@ import BottomThreeSection from './BottomThreeSection';
 import HighlightsSection from './HighlightsSection';
 import WeeklyStatsSection from './WeeklyStatsSection';
 import InfoSection from './InfoSection';
+import type { Snapshot } from '../../types/snapshot';
+import { snapshotToLegacy } from '../../types/snapshot';
 
 interface GameweekViewProps {
   gameweekId: string;
@@ -13,41 +15,43 @@ interface GameweekViewProps {
 }
 
 const GameweekView: React.FC<GameweekViewProps> = ({ gameweekId, onBackToHome }) => {
-  const [gameweekData, setGameweekData] = useState<any>(null);
+  const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchGameweekData = async () => {
+    const fetchSnapshot = async () => {
       try {
         setLoading(true);
         setError(null);
         
-        const response = await fetch(`/api/history/${gameweekId}?ts=${Date.now()}`, { cache: 'no-store' as RequestCache });
+        const response = await fetch(`/api/history/${gameweekId}?ts=${Date.now()}`, { 
+          cache: 'no-store' as RequestCache 
+        });
         
         if (!response.ok) {
           if (response.status === 404) {
-            setError(`Ingen data tilgjengelig for Gameweek ${gameweekId}.`);
+            setError(`Ingen snapshot tilgjengelig for Gameweek ${gameweekId}.`);
           } else {
             throw new Error(`API error: ${response.status}`);
           }
           return;
         }
         
-        const data = await response.json();
-        console.log('[GameweekView] Loaded snapshot for GW', gameweekId, data);
-        setGameweekData(data);
+        const data: Snapshot = await response.json();
+        console.log('[GameweekView] Loaded complete snapshot for GW', gameweekId, data);
+        setSnapshot(data);
         
       } catch (err) {
         console.error(`[GameweekView] Error fetching gameweek ${gameweekId}:`, err);
-        setError('Kunne ikke hente data for denne gameweek. Prøv igjen senere.');
+        setError('Kunne ikke hente snapshot for denne gameweek. Prøv igjen senere.');
       } finally {
         setLoading(false);
       }
     };
 
     if (gameweekId) {
-      fetchGameweekData();
+      fetchSnapshot();
     }
   }, [gameweekId]);
 
@@ -56,7 +60,7 @@ const GameweekView: React.FC<GameweekViewProps> = ({ gameweekId, onBackToHome })
       <div className="min-h-screen bg-gradient-to-br from-[#9B27E8] via-[#3E9BF9] to-[#00E0D3] flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
-          <p className="text-white">Laster gameweek data...</p>
+          <p className="text-white">Laster snapshot...</p>
         </div>
       </div>
     );
@@ -82,52 +86,33 @@ const GameweekView: React.FC<GameweekViewProps> = ({ gameweekId, onBackToHome })
     );
   }
 
-  if (!gameweekData) {
+  if (!snapshot) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-[#9B27E8] via-[#3E9BF9] to-[#00E0D3] flex items-center justify-center">
         <div className="text-center">
-          <p className="text-white">Ingen data tilgjengelig</p>
+          <p className="text-white">Ingen snapshot tilgjengelig</p>
         </div>
       </div>
     );
   }
 
-  // Transform historical data into the same format as App.tsx (robust to key variations)
-  const rawTop = gameweekData.top3 || gameweekData.topThree || gameweekData.top || [];
-  const rawBottom = gameweekData.bottom3 || gameweekData.bottomThree || gameweekData.bottom || [];
+  // Transform snapshot to component-compatible format
+  const topThree = snapshot.top3.map(team => ({
+    rank: team.rank,
+    teamName: team.team,
+    manager: team.manager,
+    points: team.points
+  }));
 
-  const topThree = Array.isArray(rawTop)
-    ? rawTop.map((team: any, index: number) => ({
-        rank: team.rank ?? index + 1,
-        teamName: team.teamName || team.entry_name || team.team || '-',
-        manager: team.manager || team.player_name || team.managerName || '-',
-        points: team.points ?? team.total ?? team.event_total ?? 0,
-      }))
-    : [];
+  const bottomThree = snapshot.bottom3.map(team => ({
+    rank: team.rank,
+    teamName: team.team,
+    manager: team.manager,
+    points: team.points
+  }));
 
-  const bottomThree = Array.isArray(rawBottom)
-    ? rawBottom.map((team: any, index: number) => ({
-        rank: team.rank ?? ((Array.isArray(rawTop) ? rawTop.length : 3) - 2 + index),
-        teamName: team.teamName || team.entry_name || team.team || '-',
-        manager: team.manager || team.player_name || team.managerName || '-',
-        points: team.points ?? team.total ?? team.event_total ?? 0,
-      }))
-    : [];
-
-  const leagueName = (rawTop?.[0]?.league_name)
-    || gameweekData.leagueName
-    || gameweekData.summary?.leagueName
-    || 'Historisk Liga';
-
-  const summaryText = typeof gameweekData.summary === 'string'
-    ? gameweekData.summary
-    : (gameweekData.summary?.text || '');
-
-  const highlights = gameweekData.highlights
-    || gameweekData.weeklyStats?.highlights
-    || [];
-
-  const weeklyStats = gameweekData.weeklyStats || gameweekData.weekly || null;
+  // Convert snapshot to legacy format for WeeklyStatsSection
+  const weeklyStats = snapshotToLegacy(snapshot);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#9B27E8] via-[#3E9BF9] to-[#00E0D3] relative overflow-hidden">
@@ -137,13 +122,13 @@ const GameweekView: React.FC<GameweekViewProps> = ({ gameweekId, onBackToHome })
       <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* IDENTICAL Header */}
         <HeaderSection 
-          leagueName={leagueName} 
-          currentGameweek={parseInt(gameweekId)} 
+          leagueName={snapshot.meta.leagueName} 
+          currentGameweek={snapshot.meta.gameweek} 
         />
 
         {/* IDENTICAL Butler's Assessment Section */}
         <ButlerAssessment 
-          assessment={summaryText} 
+          assessment={snapshot.butler.summary} 
           isLoading={false} 
         />
 
@@ -165,20 +150,19 @@ const GameweekView: React.FC<GameweekViewProps> = ({ gameweekId, onBackToHome })
 
             {/* IDENTICAL Highlights Section */}
             <HighlightsSection 
-              highlights={highlights || []} 
+              highlights={snapshot.highlights} 
               isLoading={false} 
             />
           </div>
 
           {/* Right Column - Weekly Stats */}
           <div className="space-y-4">
-            {weeklyStats && (
-              <WeeklyStatsSection 
-                weeklyStats={weeklyStats} 
-                currentGameweek={parseInt(gameweekId)} 
-                isLoading={false} 
-              />
-            )}
+            {/* IDENTICAL Weekly Stats using same data structure */}
+            <WeeklyStatsSection 
+              weeklyStats={weeklyStats} 
+              currentGameweek={snapshot.meta.gameweek} 
+              isLoading={false} 
+            />
 
             {/* IDENTICAL Info Section */}
             <InfoSection />

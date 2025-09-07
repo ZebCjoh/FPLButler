@@ -1,5 +1,7 @@
 import { put, list } from '@vercel/blob';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { composeSnapshot } from '../lib/snapshot';
+import type { Snapshot } from '../types/snapshot';
 
 interface HistoryEntry {
   id: number;
@@ -7,39 +9,12 @@ interface HistoryEntry {
   url: string;
 }
 
-interface GameweekData {
-  id: number;
-  gameweek: number;
-  summary: string;
-  top3?: any[];
-  bottom3?: any[];
-  form?: {
-    hot: any[];
-    cold: any[];
-  };
-  weeklyStats?: any;
-  highlights?: any[];
-  createdAt: string;
-}
-
-// Helper function to save gameweek history
-async function saveGameweekHistory(gameweek: number, fullData: any, token: string) {
-  const createdAt = new Date().toISOString();
+// Helper function to save complete gameweek snapshot
+async function saveGameweekSnapshot(snapshot: Snapshot, token: string) {
+  const gameweek = snapshot.meta.gameweek;
   
-  // 1. Save individual gameweek file with complete data
-  const gameweekData: GameweekData = {
-    id: gameweek,
-    gameweek,
-    summary: fullData.summary || '',
-    top3: fullData.top3 || [],
-    bottom3: fullData.bottom3 || [],
-    form: fullData.form || { hot: [], cold: [] },
-    weeklyStats: fullData.weeklyStats || {},
-    highlights: fullData.highlights || [],
-    createdAt
-  };
-  
-  await put(`gw-${gameweek}.json`, JSON.stringify(gameweekData), {
+  // 1. Save complete snapshot to gw-[id].json
+  await put(`gw-${gameweek}.json`, JSON.stringify(snapshot, null, 2), {
     access: 'public',
     contentType: 'application/json',
     token,
@@ -49,7 +24,6 @@ async function saveGameweekHistory(gameweek: number, fullData: any, token: strin
   // 2. Update history index
   let historyIndex: HistoryEntry[] = [];
   
-  // Try to get existing history
   try {
     const { blobs } = await list({ token, prefix: 'history.json' as any });
     const historyBlob = blobs?.find((b: any) => b.pathname === 'history.json');
@@ -62,7 +36,7 @@ async function saveGameweekHistory(gameweek: number, fullData: any, token: strin
   }
   
   // Generate title from summary (first sentence or fallback)
-  const summary = fullData.summary || '';
+  const summary = snapshot.butler.summary;
   const firstSentence = summary.split('.')[0] + '.';
   const title = firstSentence.length > 50 
     ? `GW ${gameweek} – ${firstSentence.substring(0, 47)}...`
@@ -93,11 +67,9 @@ async function saveGameweekHistory(gameweek: number, fullData: any, token: strin
     addRandomSuffix: false
   });
   
-  console.log(`[History] Saved GW ${gameweek} to history with ${historyIndex.length} total entries`);
+  console.log(`[History] Saved complete snapshot for GW ${gameweek} with ${historyIndex.length} total entries`);
 }
 
-// This function now uses the Vercel Node.js runtime.
-// The 'edge' runtime was removed for better stability with @vercel/blob.
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Set CORS headers for all responses
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -116,42 +88,52 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   
   try {
     if (req.method === 'POST') {
-      // Accept either simple {gameweek, summary} or full gameweek data
-      const body = req.body || {};
-      const gameweek = body.gameweek;
-      const summary = body.summary;
+      // Generate complete snapshot or accept pre-generated one
+      let snapshot: Snapshot;
       
-      if (!gameweek || !summary) {
-        return res.status(400).json({ error: 'Missing gameweek or summary in request body' });
+      if (req.body && req.body.snapshot) {
+        // Accept pre-generated snapshot
+        snapshot = req.body.snapshot as Snapshot;
+        console.log(`[ai-summary] Received pre-generated snapshot for GW ${snapshot.meta.gameweek}`);
+      } else {
+        // Generate new snapshot
+        const gameweek = req.body?.gameweek;
+        const leagueId = req.body?.leagueId || '155099';
+        
+        if (!gameweek) {
+          return res.status(400).json({ error: 'Missing gameweek in request body' });
+        }
+        
+        console.log(`[ai-summary] Generating snapshot for league ${leagueId}, GW ${gameweek}`);
+        snapshot = await composeSnapshot(leagueId, gameweek);
       }
       
       // Save current AI summary (simple format for compatibility)
-      const { url } = await put('ai-summary.json', JSON.stringify({
-        gameweek,
-        summary
+      const { url: summaryUrl } = await put('ai-summary.json', JSON.stringify({
+        gameweek: snapshot.meta.gameweek,
+        summary: snapshot.butler.summary,
+        generatedAt: snapshot.meta.createdAt
       }), {
         access: 'public',
         contentType: 'application/json',
         token,
-        addRandomSuffix: false // Important to overwrite the same file
+        addRandomSuffix: false
       });
       
-      // Save to history with full data if provided, otherwise just summary
-      const fullData = {
-        summary,
-        top3: body.top3 || [],
-        bottom3: body.bottom3 || [],
-        form: body.form || { hot: [], cold: [] },
-        weeklyStats: body.weeklyStats || {},
-        highlights: body.highlights || []
-      };
+      // Save complete snapshot to history
+      await saveGameweekSnapshot(snapshot, token);
       
-      await saveGameweekHistory(gameweek, fullData, token);
-      
-      return res.status(200).json({ success: true, url, gameweek, historySaved: true });
+      return res.status(200).json({ 
+        success: true, 
+        url: summaryUrl, 
+        gameweek: snapshot.meta.gameweek, 
+        historySaved: true,
+        snapshotSize: JSON.stringify(snapshot).length
+      });
     }
 
     if (req.method === 'GET') {
+      // Return current AI summary (legacy compatibility)
       const { blobs } = await list({ token, prefix: 'ai-summary.json' as any });
       const candidates = (blobs || []).filter((b: any) => b.pathname === 'ai-summary.json');
       const stateBlob = candidates.sort((a: any, b: any) => {
@@ -159,6 +141,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const atB = new Date(b.uploadedAt || b.createdAt || 0).getTime();
         return atB - atA;
       })[0];
+      
       if (!stateBlob) {
         return res.status(200).json({
           ok: false,
@@ -167,7 +150,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
       }
 
-      // Avoid CDN stale cache by appending a cache-busting query param and disabling request cache
+      // Avoid CDN stale cache
       const bust = Date.now();
       const text = await (await fetch(`${stateBlob.url}?ts=${bust}`, { cache: 'no-store' as RequestCache })).text();
       res.setHeader('Content-Type', 'application/json');
