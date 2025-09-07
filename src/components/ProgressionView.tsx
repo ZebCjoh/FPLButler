@@ -235,9 +235,9 @@ const ProgressionView: React.FC<ProgressionViewProps> = ({ onBackToHome }) => {
   const colors = generateColors(progressionData.managers.length);
   const maxRank = Math.max(...progressionData.managers.flatMap(m => m.data.map(d => d.rank)));
 
-  // Custom tooltip
+  // Custom tooltip - only for desktop
   const CustomTooltip = ({ active, payload, label }: any) => {
-    if (active && payload && payload.length) {
+    if (active && payload && payload.length && !isMobile) {
       // Sorter payload etter rank for bedre oversikt
       const sortedPayload = [...payload].sort((a, b) => a.value - b.value);
       
@@ -314,7 +314,7 @@ const ProgressionView: React.FC<ProgressionViewProps> = ({ onBackToHome }) => {
                   reversed={true}
                   width={isMobile ? 28 : 56}
                 />
-                <Tooltip content={<CustomTooltip />} />
+                {!isMobile && <Tooltip content={<CustomTooltip />} />}
                 <Legend 
                   wrapperStyle={{
                     paddingTop: isMobile ? '4px' : '12px',
