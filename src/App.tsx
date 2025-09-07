@@ -1,6 +1,13 @@
 import { useState, useEffect } from 'react';
 import { getHighlights } from './logic/metrics';
 import GameweekView from './components/GameweekView';
+import HeaderSection from './components/HeaderSection';
+import ButlerAssessment from './components/ButlerAssessment';
+import TopThreeSection from './components/TopThreeSection';
+import BottomThreeSection from './components/BottomThreeSection';
+import HighlightsSection from './components/HighlightsSection';
+import WeeklyStatsSection from './components/WeeklyStatsSection';
+import InfoSection from './components/InfoSection';
 
 export const App = () => {
   const [standings, setStandings] = useState<any[]>([]);
@@ -501,29 +508,10 @@ export const App = () => {
       <div className="absolute inset-0 bg-black/40"></div>
       
       <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {/* Compact Header */}
-        <header className="text-center mb-8">
-          <div className="inline-block px-6 py-4 rounded-2xl bg-[#3D195B] border-2 border-[#00E0D3] mb-4 shadow-xl">
-            <div className="flex items-center justify-center gap-4">
-              <img 
-                src="/fpl-butler.png" 
-                alt="FPL Butler" 
-                className="h-12 w-12 rounded-full ring-2 ring-cyan-300 shadow-md object-cover"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).style.display = 'none';
-                }}
-              />
-              <h1 className="text-4xl md:text-5xl font-bold text-white drop-shadow-lg">
-                FPL Butler
-              </h1>
-            </div>
-          </div>
-          <div className="text-white">
-            <p className="text-lg font-light mb-1">Ukentlig oppsummering</p>
-            <p className="text-base font-medium mb-1">Liga: {standings[0]?.league_name || 'Laster liga...'}</p>
-            <p className="text-base font-medium">Gameweek {currentGameweek || '–'}</p>
-          </div>
-        </header>
+        <HeaderSection 
+          leagueName={standings[0]?.league_name || 'Laster liga...'} 
+          currentGameweek={currentGameweek} 
+        />
 
         {/* Show static UI immediately - no more blocking loading state */}
 
@@ -538,28 +526,10 @@ export const App = () => {
 
         {/* Butler's Assessment Section */}
         {!error && (
-          <section className="mb-8">
-            <div className="bg-[#3D195B] border-2 border-[#00E0D3]/60 rounded-2xl p-6 max-w-4xl mx-auto">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-12 h-12 rounded-full bg-[#00E0D3]/60 flex items-center justify-center text-2xl">
-                  🍷
-                </div>
-                <h3 className="text-xl font-bold text-white">Butlerens vurdering</h3>
-              </div>
-              <div className="bg-[#00E0D3]/10 rounded-lg p-4">
-                {loadingStates.aiSummary ? (
-                  <div className="flex items-center gap-2">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-[#00E0D3]"></div>
-                    <p className="text-white/70 text-sm italic">Butleren forbereder sin vurdering...</p>
-                  </div>
-                ) : (
-                  <p className="text-white leading-relaxed text-sm">
-                    {butlerAssessment || "Butleren vurderer dagens prestasjoner..."}
-                  </p>
-                )}
-              </div>
-            </div>
-          </section>
+          <ButlerAssessment 
+            assessment={butlerAssessment} 
+            isLoading={loadingStates.aiSummary} 
+          />
         )}
 
         {/* Main Content - 2 Column Layout */}
@@ -567,432 +537,33 @@ export const App = () => {
           <main className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {/* Left Column */}
             <div className="space-y-8">
-              {/* Compact Top 3 Podium Section */}
-              <section>
-                <div className="text-center mb-6">
-                  <h2 className="text-2xl md:text-3xl font-bold text-white mb-2">
-                    🏆 Topp 3
-                  </h2>
-                  <p className="text-white/80 text-sm">De beste lagene i ligaen</p>
-                </div>
-                
-                {loadingStates.standings ? (
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {[1, 2, 3].map(i => (
-                      <div key={i} className="bg-[#3D195B] border-2 border-[#00E0D3]/60 rounded-2xl p-4">
-                        <div className="text-center space-y-3">
-                          <div className="w-12 h-12 mx-auto bg-gray-600 rounded-full animate-pulse"></div>
-                          <div className="h-4 bg-gray-600 rounded animate-pulse"></div>
-                          <div className="h-3 bg-gray-600 rounded w-2/3 mx-auto animate-pulse"></div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch">
-                    {topThree.map(({ rank, teamName, manager, points }) => (
-                      <div
-                        key={rank}
-                        className={`
-                          h-full group cursor-pointer transform transition-all duration-300 hover:scale-105
-                          ${rank === 1 ? 'md:order-2' : rank === 2 ? 'md:order-1 md:mt-4' : 'md:order-3 md:mt-4'}
-                        `}
-                      >
-                        {/* Compact Card with justify-between layout */}
-                        <div className={`
-                          flex h-full flex-col justify-between rounded-xl shadow-xl border-2 p-4
-                          ${rank === 1 
-                            ? 'bg-[#3D195B] border-[#FFD700]' 
-                            : rank === 2
-                            ? 'bg-[#360D3A] border-[#00E0D3]/80'
-                            : 'bg-[#2D0A2E] border-[#00E0D3]/60'
-                          }
-                        `}>
-                          
-                          {/* Rank Badge */}
-                          <div className="flex items-center justify-center">
-                            <div className={`
-                              w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold shadow-lg border-2
-                              ${rank === 1 
-                                ? 'bg-gradient-to-br from-[#FFD700] to-[#FFA500] text-black border-white' 
-                                : 'bg-[#00E0D3]/80 text-[#3D195B] border-white/80'
-                              }
-                            `}>
-                              {rank}
-                            </div>
-                          </div>
+              <TopThreeSection 
+                topThree={topThree} 
+                isLoading={loadingStates.standings} 
+              />
 
-                          {/* Team Info Block - with realistic min-height for 2 lines + manager */}
-                          <div className="flex flex-col items-center text-center min-h-[56px] justify-center">
-                            <h3 className="font-bold text-white leading-tight max-w-[18ch] clamp-2 text-sm">
-                              {teamName}
-                            </h3>
-                            <p className="mt-1 text-xs text-white/90 font-medium">av {manager}</p>
-                          </div>
+              <BottomThreeSection 
+                bottomThree={bottomThree} 
+                isLoading={loadingStates.standings} 
+              />
 
-                          {/* Points Box - no mt-auto needed with justify-between */}
-                          <div className="bg-[#00E0D3]/20 border border-[#00E0D3] rounded-lg px-3 py-2 text-center">
-                            <div className="text-lg font-bold text-white">{points}</div>
-                            <div className="text-xs text-white/90">poeng</div>
-                          </div>
-
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </section>
-
-              {/* Compact Bottom 3 Section */}
-              <section>
-                <div className="text-center mb-6">
-                  <h2 className="text-2xl md:text-3xl font-bold text-white mb-2">📉 Bunn 3</h2>
-                  <p className="text-white/80 text-sm">Lagene som må skjerpe seg</p>
-                </div>
-                
-                <div className="grid grid-cols-1 gap-4">
-                  {bottomThree.map(({ rank, teamName, manager, points }, index) => (
-                    <div
-                      key={rank}
-                      className={`
-                        group border-2 rounded-xl p-4 transition-all duration-300 hover:scale-105 hover:shadow-lg
-                        ${index === 0 
-                          ? 'bg-[#3D195B] border-[#00E0D3]/60' 
-                          : index === 1
-                          ? 'bg-[#360D3A] border-[#00E0D3]/80'
-                          : 'bg-[#2D0A2E] border-[#00E0D3]'
-                        }
-                      `}
-                    >
-                      <div className="flex items-center gap-4">
-                        <div className={`
-                          w-12 h-12 rounded-full border-2 border-white flex items-center justify-center font-bold text-sm shadow-lg
-                          ${index === 0 
-                            ? 'bg-red-600/70 text-white' 
-                            : index === 1
-                            ? 'bg-red-700/80 text-white'
-                            : 'bg-red-800 text-white'
-                          }
-                        `}>
-                          {rank}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-bold text-white mb-1 truncate">{teamName}</h3>
-                          <p className="text-white/80 text-xs truncate">av {manager}</p>
-                        </div>
-                        <div className="text-center bg-[#00E0D3]/20 border border-[#00E0D3] rounded-lg p-2">
-                          <div className="text-lg font-bold text-white">{points}</div>
-                          <div className="text-white/80 text-xs">poeng</div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </section>
-
-              {/* Compact Highlights Section */}
-              <section>
-                <div className="text-center mb-4">
-                  <h2 className="text-2xl font-bold text-white mb-2">
-                    ✨ Høydepunkter
-                  </h2>
-                  <p className="text-white/80 text-xs">Rundens mest interessante øyeblikk</p>
-          </div>
-
-                <div className="grid grid-cols-1 gap-3">
-                  {Array.isArray(weeklyStats?.highlights) && weeklyStats.highlights.length > 0 ? (
-                    weeklyStats.highlights.map((h: { id: number; text: string }, index: number) => (
-                      <div 
-                        key={h.id ?? index} 
-                        className="group bg-[#3D195B] border-2 border-[#00E0D3]/60 rounded-lg p-3 transition-all duration-300 hover:border-[#00E0D3] hover:scale-105"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-[#00E0D3] border-2 border-white flex items-center justify-center text-[#3D195B] text-xs font-bold shadow-lg">
-                            {index + 1}
-                          </div>
-                          <p className="text-white leading-relaxed text-sm flex-1">{h.text}</p>
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="text-center text-white/80 text-sm">
-                      Ingen høydepunkter tilgjengelig
-                    </div>
-                  )}
-                </div>
-              </section>
+              <HighlightsSection 
+                highlights={weeklyStats?.highlights || []} 
+                isLoading={loadingStates.liveData} 
+              />
             </div>
 
             {/* Right Column - Weekly Stats */}
             <div className="space-y-4">
-              {loadingStates.liveData ? (
-                <section>
-                  <div className="text-center mb-4">
-                    <h2 className="text-2xl md:text-3xl font-bold text-white mb-2">
-                      📊 Ukestatistikk
-                    </h2>
-                    <p className="text-white/80 text-sm">Gameweek {currentGameweek || '–'} høydepunkter</p>
-                  </div>
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 mb-4">
-                    {[...Array(6)].map((_, i) => (
-                      <div key={i} className="bg-[#3D195B] border-2 border-[#00E0D3]/60 rounded-2xl p-4">
-                        <div className="space-y-3">
-                          <div className="h-5 bg-gray-600 rounded w-3/4 animate-pulse"></div>
-                          <div className="h-4 bg-gray-600 rounded w-1/2 animate-pulse"></div>
-                          <div className="h-3 bg-gray-600 rounded w-full animate-pulse"></div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </section>
-              ) : weeklyStats && (
-                <section>
-                  <div className="text-center mb-4">
-                    <h2 className="text-2xl md:text-3xl font-bold text-white mb-2">
-                      📊 Ukestatistikk
-                    </h2>
-                    <p className="text-white/80 text-sm">Gameweek {currentGameweek || '–'} høydepunkter</p>
-                  </div>
-                  
-                  {/* 2-Column Grid for Compact Stats */}
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 mb-4">
-                    {/* Ukens Vinner */}
-                    <div className="bg-[#3D195B] border-2 border-[#00E0D3] rounded-xl p-3 hover:scale-105 transition-all duration-300">
-                      <div className="flex items-center gap-2 mb-2">
-                        <div className="w-8 h-8 rounded-full bg-[#00E0D3] flex items-center justify-center text-sm">
-                          🏆
-                        </div>
-                        <h3 className="text-sm font-bold text-white">Ukens Vinner</h3>
-                      </div>
-                      <div className="text-center">
-                        <p className="text-white font-bold text-sm mb-1 truncate">{weeklyStats.weekWinner.teamName}</p>
-                        <p className="text-white/80 text-xs mb-2 truncate">av {weeklyStats.weekWinner.manager}</p>
-                        <div className="bg-[#00E0D3]/20 border border-[#00E0D3] rounded-lg p-2">
-                          <span className="text-lg font-bold text-white">{weeklyStats.weekWinner.points}</span>
-                          <p className="text-white/80 text-xs">poeng</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Ukens Taper */}
-                    <div className="bg-[#3D195B] border-2 border-[#00E0D3]/60 rounded-xl p-3 hover:scale-105 transition-all duration-300">
-                      <div className="flex items-center gap-2 mb-2">
-                        <div className="w-8 h-8 rounded-full bg-[#00E0D3]/60 flex items-center justify-center text-sm">
-                          😔
-                        </div>
-                        <h3 className="text-sm font-bold text-white">Ukens Taper</h3>
-                      </div>
-                      <div className="text-center">
-                        <p className="text-white font-bold text-sm mb-1 truncate">{weeklyStats.weekLoser.teamName}</p>
-                        <p className="text-white/80 text-xs mb-2 truncate">av {weeklyStats.weekLoser.manager}</p>
-                        <div className="bg-[#00E0D3]/20 border border-[#00E0D3]/60 rounded-lg p-2">
-                          <span className="text-lg font-bold text-white">{weeklyStats.weekLoser.points}</span>
-                          <p className="text-white/80 text-xs">poeng</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Benkesliter */}
-                    <div className="bg-[#3D195B] border-2 border-[#00E0D3]/60 rounded-xl p-3 hover:scale-105 transition-all duration-300">
-                      <div className="flex items-center gap-2 mb-2">
-                        <div className="w-8 h-8 rounded-full bg-[#00E0D3]/60 flex items-center justify-center text-sm">
-                          🪑
-                        </div>
-                        <h3 className="text-sm font-bold text-white">Benkesliter</h3>
-                      </div>
-                      <div className="text-center">
-                        <p className="text-white font-bold text-sm mb-2 truncate">{weeklyStats.benchWarmer.manager}</p>
-                        <div className="bg-[#00E0D3]/20 border border-[#00E0D3]/60 rounded-lg p-2">
-                          <span className="text-lg font-bold text-white">{weeklyStats.benchWarmer.benchPoints}</span>
-                          <p className="text-white/80 text-xs">på benken</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Chips Brukt */}
-                    <div className="bg-[#3D195B] border-2 border-[#00E0D3]/60 rounded-xl p-3 hover:scale-105 transition-all duration-300">
-                      <div className="flex items-center gap-2 mb-2">
-                        <div className="w-8 h-8 rounded-full bg-[#00E0D3]/60 flex items-center justify-center text-sm">
-                          🎯
-                        </div>
-                        <h3 className="text-sm font-bold text-white">Chips Brukt</h3>
-                      </div>
-                      <div className="space-y-1">
-                        {weeklyStats.chipsUsed.length > 0 ? weeklyStats.chipsUsed.slice(0, 3).map((chip: any, index: number) => (
-                          <div key={index} className="flex items-center gap-2 bg-[#00E0D3]/10 rounded-lg p-1">
-                            <span className="text-xs">{chip.emoji}</span>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-white font-medium text-xs truncate">{chip.teamName}</p>
-                            </div>
-                          </div>
-                        )) : (
-                          <p className="text-white/80 text-xs text-center">Ingen chips brukt</p>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Bevegelser */}
-                    <div className="bg-[#3D195B] border-2 border-[#00E0D3]/60 rounded-xl p-3 hover:scale-105 transition-all duration-300">
-                      <div className="flex items-center gap-2 mb-2">
-                        <div className="w-8 h-8 rounded-full bg-[#00E0D3]/60 flex items-center justify-center text-sm">
-                          📈
-                        </div>
-                        <h3 className="text-sm font-bold text-white">Bevegelser</h3>
-                      </div>
-                      <div className="space-y-1">
-                        <div className="bg-green-900/30 border border-green-600/50 rounded-lg p-1">
-                          <div className="flex items-center gap-1">
-                            <span className="text-xs">🚀</span>
-                            <span className="text-green-400 font-bold text-xs">+{weeklyStats.movements.riser.change}</span>
-                          </div>
-                          <p className="text-white text-xs truncate">{weeklyStats.movements.riser.manager}</p>
-                        </div>
-                        <div className="bg-red-900/30 border border-red-600/50 rounded-lg p-1">
-                          <div className="flex items-center gap-1">
-                            <span className="text-xs">⬇️</span>
-                            <span className="text-red-400 font-bold text-xs">{weeklyStats.movements.faller.change}</span>
-                          </div>
-                          <p className="text-white text-xs truncate">{weeklyStats.movements.faller.manager}</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Neste Deadline */}
-                    <div className="bg-[#3D195B] border-2 border-[#00E0D3] rounded-xl p-3 hover:scale-105 transition-all duration-300">
-                      <div className="flex items-center gap-2 mb-2">
-                        <div className="w-8 h-8 rounded-full bg-[#00E0D3] flex items-center justify-center text-sm">
-                          ⏰
-                        </div>
-                        <h3 className="text-sm font-bold text-white">Neste Frist</h3>
-                      </div>
-                      <div className="text-center">
-                        <p className="text-white/80 text-xs mb-1">GW {weeklyStats.nextDeadline.gameweek}</p>
-                        <div className="bg-[#00E0D3]/20 border border-[#00E0D3] rounded-lg p-2">
-                          <p className="text-white font-bold text-sm">{weeklyStats.nextDeadline.date}</p>
-                          <p className="text-white/80 text-xs">{weeklyStats.nextDeadline.time}</p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Wider Cards Grid */}
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                    {/* Form Table */}
-                    <div className="bg-[#3D195B] border-2 border-[#00E0D3]/60 rounded-xl p-3 hover:scale-105 transition-all duration-300">
-                      <div className="flex items-center gap-2 mb-2">
-                        <div className="w-8 h-8 rounded-full bg-[#00E0D3]/60 flex items-center justify-center text-sm">
-                          📈
-                        </div>
-                        <h3 className="text-sm font-bold text-white">Form (GW {weeklyStats.formData?.window || 3})</h3>
-                      </div>
-                      <div className="space-y-2">
-                        <div className="bg-green-900/30 border border-green-600/50 rounded-lg p-2">
-                          <p className="text-green-400 font-bold text-xs mb-1">🔥 Hot</p>
-                          {weeklyStats.formTable.hotStreak.length === 0 ? (
-                            <p className="text-green-300/70 text-xs">Ingen data</p>
-                          ) : (
-                            weeklyStats.formTable.hotStreak.slice(0, 2).map((team: any, index: number) => (
-                              <div key={index} className="flex justify-between items-center">
-                                <span className="text-white text-xs truncate">{team.manager}</span>
-                                <span className="text-green-300 font-bold text-xs">{team.formPoints}p</span>
-                              </div>
-                            ))
-                          )}
-                        </div>
-                        <div className="bg-red-900/30 border border-red-600/50 rounded-lg p-2">
-                          <p className="text-red-400 font-bold text-xs mb-1">🧊 Cold</p>
-                          {weeklyStats.formTable.coldStreak.length === 0 ? (
-                            <p className="text-red-300/70 text-xs">Ingen data</p>
-                          ) : (
-                            weeklyStats.formTable.coldStreak.slice(0, 2).map((team: any, index: number) => (
-                              <div key={index} className="flex justify-between items-center">
-                                <span className="text-white text-xs truncate">{team.manager}</span>
-                                <span className="text-red-300 font-bold text-xs">{team.formPoints}p</span>
-                              </div>
-                            ))
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Transfer ROI */}
-                    <div className="bg-[#3D195B] border-2 border-[#00E0D3]/60 rounded-xl p-3 hover:scale-105 transition-all duration-300">
-                      <div className="flex items-center gap-2 mb-2">
-                        <div className="w-8 h-8 rounded-full bg-[#00E0D3]/60 flex items-center justify-center text-sm">
-                          💰
-                        </div>
-                        <h3 className="text-sm font-bold text-white">Transfer ROI</h3>
-                      </div>
-                      <div className="space-y-2">
-                        <div className="bg-green-900/30 border border-green-600/50 rounded-lg p-2">
-                          <div className="flex items-center gap-1 mb-1">
-                            <span className="text-xs">💎</span>
-                            <span className="text-green-400 font-bold text-xs">Geni</span>
-                          </div>
-                          <p className="text-white font-medium text-xs mb-1 truncate">{weeklyStats.transferROI.genius.manager}</p>
-                          <div className="flex justify-between items-center">
-                            <span className="text-white/80 text-xs truncate">{weeklyStats.transferROI.genius.transfersIn[0]?.name || 'Ingen bytter'}</span>
-                            <span className="text-green-300 font-bold text-xs">{weeklyStats.transferROI.genius.transfersIn[0]?.points || 0}p</span>
-                          </div>
-                        </div>
-                        <div className="bg-red-900/30 border border-red-600/50 rounded-lg p-2">
-                          <div className="flex items-center gap-1 mb-1">
-                            <span className="text-xs">💸</span>
-                            <span className="text-red-400 font-bold text-xs">Bom</span>
-                          </div>
-                          <p className="text-white font-medium text-xs mb-1 truncate">{weeklyStats.transferROI.flop.manager}</p>
-                          <div className="flex justify-between items-center">
-                            <span className="text-white/80 text-xs truncate">{weeklyStats.transferROI.flop.transfersIn[0]?.name || 'Ingen bytter'}</span>
-                            <span className="text-red-300 font-bold text-xs">{weeklyStats.transferROI.flop.transfersIn[0]?.points || 0}p</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Differential Hero - Full Width */}
-                  <div className="bg-[#3D195B] border-2 border-[#00E0D3]/60 rounded-xl p-3 hover:scale-105 transition-all duration-300 mt-3">
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="w-8 h-8 rounded-full bg-[#00E0D3]/60 flex items-center justify-center text-sm">
-                        🎯
-                      </div>
-                      <h3 className="text-sm font-bold text-white">Differential-helt</h3>
-                    </div>
-                    <div className="text-center">
-                      <div className="bg-purple-900/30 border border-purple-600/50 rounded-lg p-2 mb-2">
-                        <p className="text-purple-300 font-bold text-sm">{weeklyStats.differential.player}</p>
-                        <div className="flex justify-center items-center gap-2 mt-1">
-                          <span className="text-lg font-bold text-white">{weeklyStats.differential.points}</span>
-                          <span className="text-white/60 text-xs">poeng</span>
-                        </div>
-                      </div>
-                                              <div className="bg-[#00E0D3]/10 rounded-lg p-2">
-                          <p className="text-white/80 text-xs mb-1">Eid av kun {weeklyStats.differential.ownership} lag</p>
-                          <div className="flex flex-wrap gap-1 justify-center">
-                            {weeklyStats.differential.managers.slice(0, 3).map((manager: string, index: number) => (
-                              <span key={index} className="text-white font-medium text-xs bg-[#00E0D3]/20 rounded px-2 py-1">{manager}</span>
-                            ))}
-                          </div>
-                        </div>
-                    </div>
-                  </div>
-                </section>
+              {weeklyStats && (
+                <WeeklyStatsSection 
+                  weeklyStats={weeklyStats} 
+                  currentGameweek={currentGameweek} 
+                  isLoading={loadingStates.liveData} 
+                />
               )}
 
-              {/* Compact Info Section */}
-              <section className="text-center">
-                <div className="bg-[#3D195B] border-2 border-[#00E0D3] rounded-xl p-4">
-                  <div className="flex items-center justify-center gap-2 mb-2">
-                    <span className="text-lg">🚀</span>
-                    <h3 className="text-base font-bold text-white">
-                      Live FPL Data
-                    </h3>
-                  </div>
-                  <p className="text-white/80 text-xs">
-                    Dataene hentes direkte fra Fantasy Premier League API i sanntid.
-                  </p>
-                </div>
-              </section>
+              <InfoSection />
 
               {/* History Dropdown */}
               <section className="mt-8">
