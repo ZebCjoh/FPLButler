@@ -255,134 +255,146 @@ async function composeSnapshot(leagueId: string, gameweek: number): Promise<Snap
       (current.change < worst.change) ? current : worst
     );
     
-    // 7. Form analysis - simplified version (real version would fetch per-entry history)
+    // 7. Per-entry data: picks, history, transfers (match homepage behavior)
+    const entryIds = standings.map((row: any) => row.entry);
+    const picksByEntry: Record<number, any> = {};
+    const historyByEntry: Record<number, any> = {};
+    const transfersByEntry: Record<number, any[]> = {};
+
+    const chunk = <T,>(arr: T[], size: number) => arr.reduce<T[][]>((acc, _, i) => (i % size ? acc : [...acc, arr.slice(i, i + size)]), []);
+
+    for (const group of chunk(entryIds, 6)) {
+      await Promise.all(
+        group.map(async (entryId) => {
+          try {
+            const [picks, history, transfers] = await Promise.all([
+              safeJson(`https://fantasy.premierleague.com/api/entry/${entryId}/event/${gameweek}/picks/`).catch(() => null),
+              safeJson(`https://fantasy.premierleague.com/api/entry/${entryId}/history/`).catch(() => null),
+              safeJson(`https://fantasy.premierleague.com/api/entry/${entryId}/transfers/`).catch(() => []),
+            ]);
+            if (picks) picksByEntry[entryId] = picks;
+            if (history) historyByEntry[entryId] = history;
+            transfersByEntry[entryId] = Array.isArray(transfers) ? transfers : [];
+          } catch (_) { /* ignore */ }
+        })
+      );
+    }
+
+    // 8. Form analysis (exact fallback used on homepage)
     const formWindow = Math.min(3, gameweek);
-    const formAnalysis = standings.map(entry => ({
-      manager: entry.player_name,
-      team: entry.entry_name,
-      points: (entry.event_total || 0) * formWindow // Approximate form points
-    }));
-    const formSorted = [...formAnalysis].sort((a, b) => b.points - a.points);
-    
-    // 8. Bench analysis - simplified (real version would fetch picks for all entries)
-    let benchWarmer = {
-      manager: 'Ikke tilgjengelig',
-      team: 'Ikke tilgjengelig',
-      benchPoints: 0
+    const gwSet = new Set<number>();
+    for (let i = 0; i < formWindow; i++) {
+      const gw = gameweek - i;
+      if (gw >= 1) gwSet.add(gw);
+    }
+    const formComputed = standings.map((row: any) => {
+      const entryId = row.entry;
+      const hist = historyByEntry[entryId]?.current || [];
+      const points = hist
+        .filter((h: any) => gwSet.has(h.event))
+        .reduce((sum: number, h: any) => sum + (h.points || 0), 0);
+      return { manager: row.player_name, team: row.entry_name, points };
+    });
+    const formSorted = [...formComputed].sort((a, b) => b.points - a.points);
+
+    // 9. Bench analysis (all entries)
+    const benchByEntry: Record<number, number> = {};
+    standings.forEach((row: any) => {
+      const entryId = row.entry;
+      const picks = picksByEntry[entryId]?.picks || [];
+      const bench = picks
+        .filter((p: any) => p.multiplier === 0)
+        .reduce((sum: number, p: any) => sum + (pointsByElement[p.element] || 0), 0);
+      benchByEntry[entryId] = bench;
+    });
+    const benchList = Object.entries(benchByEntry)
+      .map(([entryId, bench]) => {
+        const row = standings.find((r: any) => r.entry === Number(entryId));
+        return {
+          entryId: Number(entryId),
+          team: row?.entry_name || '-',
+          manager: row?.player_name || '-',
+          benchPoints: bench as number
+        };
+      })
+      .sort((a: any, b: any) => {
+        const diff = (b.benchPoints as number) - (a.benchPoints as number);
+        if (diff !== 0) return diff;
+        return (a.entryId as number) - (b.entryId as number);
+      });
+    const benchWarmer = benchList[0] || { manager: '-', team: '-', benchPoints: 0 };
+
+    // 10. Chips used (from picks)
+    const chipEmoji: Record<string, string> = {
+      triple_captain: '⚡',
+      wildcard: '🃏',
+      freehit: '🎯',
+      bench_boost: '🏟️',
     };
-    
-    // Try to get actual bench data for a few top entries
-    try {
-      for (const entry of standings.slice(0, 5)) {
-        try {
-          const picks: any = await safeJson(`https://fantasy.premierleague.com/api/entry/${entry.entry}/event/${gameweek}/picks/`);
-          if (picks?.picks) {
-            const bench = picks.picks
-              .filter((p: any) => p.multiplier === 0)
-              .reduce((sum: number, p: any) => sum + (pointsByElement[p.element] || 0), 0);
-            
-            if (bench > benchWarmer.benchPoints) {
-              benchWarmer = {
-                manager: entry.player_name,
-                team: entry.entry_name,
-                benchPoints: bench
-              };
-            }
-          }
-        } catch {
-          // Skip entries with no pick data
+    const chipsUsed: Array<{ manager: string; team: string; chip: string; emoji: string }> = [];
+    standings.forEach((row: any) => {
+      const entryId = row.entry;
+      const chip = picksByEntry[entryId]?.active_chip;
+      if (chip) {
+        chipsUsed.push({ manager: row.player_name, team: row.entry_name, chip, emoji: chipEmoji[chip] || '🎯' });
+      }
+    });
+
+    // 11. Transfer ROI (match homepage: sum of points for transfers in; no hit cost)
+    const roiRows: Array<{ manager: string; team: string; totalROI: number; transfersIn: Array<{ name: string; points: number }> }> = 
+      standings.map((row: any) => {
+        const entryId = row.entry;
+        const transfers = (transfersByEntry[entryId] || []).filter((t: any) => t.event === gameweek);
+        const transfersInPoints = transfers.map((t: any) => {
+          const pts = pointsByElement[t.element_in] || 0;
+          const name = elementIdToName[t.element_in] || `#${t.element_in}`;
+          return { name, points: pts };
+        });
+        const totalROI = transfersInPoints.reduce((s, x) => s + x.points, 0);
+        return {
+          team: row.entry_name,
+          manager: row.player_name,
+          transfersIn: transfersInPoints,
+          totalROI,
+        };
+      }).sort((a, b) => b.totalROI - a.totalROI);
+
+    // 12. Differential (fewest owners, tie-break on points)
+    const ownershipCount: Record<number, number> = {};
+    standings.forEach((row: any) => {
+      const entryId = row.entry;
+      const picks = picksByEntry[entryId]?.picks || [];
+      picks.forEach((p: any) => {
+        ownershipCount[p.element] = (ownershipCount[p.element] || 0) + 1;
+      });
+    });
+    let diffCandidate: { id: number; owners: number; points: number } | null = null;
+    Object.keys(ownershipCount).forEach((idStr) => {
+      const id = Number(idStr);
+      const owners = ownershipCount[id];
+      const pts = pointsByElement[id] || 0;
+      if (owners > 0) {
+        if (!diffCandidate || owners < diffCandidate.owners || (owners === diffCandidate.owners && pts > diffCandidate.points)) {
+          diffCandidate = { id, owners, points: pts };
         }
       }
-    } catch {
-      // Fallback if bench analysis fails
-    }
-    
-    // 9. Transfer ROI - simplified (real version would fetch all transfers)
-    const roiRows = [];
-    try {
-      for (const entry of standings.slice(0, 5)) {
-        try {
-          const transfers: any[] = await safeJson(`https://fantasy.premierleague.com/api/entry/${entry.entry}/transfers/`);
-          const gwTransfers = transfers.filter((t: any) => t.event === gameweek);
-          
-          let totalROI = 0;
-          const transfersIn: Array<{ name: string; points: number }> = [];
-          
-          for (const transfer of gwTransfers) {
-            const elementIn = transfer.element_in;
-            const points = pointsByElement[elementIn] || 0;
-            const cost = 4; // Standard transfer cost
-            const roi = points - cost;
-            totalROI += roi;
-            
-            transfersIn.push({
-              name: elementIdToName[elementIn] || `#${elementIn}`,
-              points: roi
-            });
-          }
-          
-          if (gwTransfers.length > 0) {
-            roiRows.push({
-              manager: entry.player_name,
-              team: entry.entry_name,
-              totalROI,
-              transfersIn
-            });
-          }
-        } catch {
-          // Skip entries without transfer data
-        }
-      }
-    } catch {
-      // Fallback if transfer analysis fails
-    }
-    
-    roiRows.sort((a, b) => b.totalROI - a.totalROI);
-    
-    // 10. Differential analysis - simplified
+    });
     let diffPlayer = '-';
     let diffPoints = 0;
     let diffOwners: string[] = [];
     let diffManagers: string[] = [];
-    
-    try {
-      const ownershipCount: Record<number, string[]> = {};
-      
-      // Sample a few entries to build ownership data
-      for (const entry of standings.slice(0, Math.min(10, standings.length))) {
-        try {
-          const picks: any = await safeJson(`https://fantasy.premierleague.com/api/entry/${entry.entry}/event/${gameweek}/picks/`);
-          if (picks?.picks) {
-            picks.picks.forEach((p: any) => {
-              if (!ownershipCount[p.element]) {
-                ownershipCount[p.element] = [];
-              }
-              ownershipCount[p.element].push(entry.entry_name);
-            });
-          }
-        } catch {
-          // Skip entries with no picks
-        }
-      }
-      
-      // Find low-ownership, high-scoring player
-      let bestDiff = { id: 0, owners: Infinity, points: 0 };
-      Object.entries(ownershipCount).forEach(([elementIdStr, owners]) => {
-        const elementId = Number(elementIdStr);
-        const points = pointsByElement[elementId] || 0;
-        
-        if (owners.length <= 3 && points > 6) {
-          if (owners.length < bestDiff.owners || (owners.length === bestDiff.owners && points > bestDiff.points)) {
-            bestDiff = { id: elementId, owners: owners.length, points };
-            diffPlayer = elementIdToName[elementId] || `#${elementId}`;
-            diffPoints = points;
-            diffOwners = owners;
-            diffManagers = owners; // Simplified
-          }
+    if (diffCandidate) {
+      const dc = diffCandidate;
+      diffPlayer = elementIdToName[dc.id] || `#${dc.id}`;
+      diffPoints = dc.points;
+      standings.forEach((row: any) => {
+        const entryId = row.entry;
+        const picks = picksByEntry[entryId]?.picks || [];
+        if (picks.some((p: any) => p.element === dc.id)) {
+          diffOwners.push(row.entry_name);
+          diffManagers.push(row.player_name);
         }
       });
-    } catch {
-      // Fallback if differential analysis fails
     }
     
     // 11. Next deadline
