@@ -145,13 +145,7 @@ export const App = () => {
 
         // Helper to fetch JSON safely
         const safeJson = async (url: string) => {
-          const r = await fetch(url, {
-            headers: {
-              'User-Agent': 'Mozilla/5.0 (compatible; FPL-Butler/1.0)',
-              'Accept': 'application/json, text/plain, */*',
-              'Referer': 'https://fantasy.premierleague.com/'
-            }
-          });
+          const r = await fetch(url, { cache: 'no-store' as RequestCache });
           const ct = r.headers.get('content-type') || '';
           if (!r.ok) throw new Error(`HTTP ${r.status}`);
           if (!ct.includes('application/json')) throw new Error('Non-JSON response');
