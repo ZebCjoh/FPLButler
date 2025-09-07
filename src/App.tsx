@@ -555,13 +555,11 @@ export const App = () => {
 
             {/* Right Column - Weekly Stats */}
             <div className="space-y-4">
-              {weeklyStats && (
-                <WeeklyStatsSection 
-                  weeklyStats={weeklyStats} 
-                  currentGameweek={currentGameweek} 
-                  isLoading={loadingStates.liveData} 
-                />
-              )}
+              <WeeklyStatsSection 
+                weeklyStats={weeklyStats || {}} 
+                currentGameweek={currentGameweek} 
+                isLoading={loadingStates.liveData} 
+              />
 
               <InfoSection />
 

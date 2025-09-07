@@ -12,7 +12,7 @@ interface BottomThreeSectionProps {
   isLoading?: boolean;
 }
 
-const BottomThreeSection: React.FC<BottomThreeSectionProps> = ({ bottomThree, isLoading: _isLoading = false }) => {
+const BottomThreeSection: React.FC<BottomThreeSectionProps> = ({ bottomThree, isLoading = false }) => {
   return (
     <section>
       <div className="text-center mb-6">
@@ -21,7 +21,22 @@ const BottomThreeSection: React.FC<BottomThreeSectionProps> = ({ bottomThree, is
       </div>
       
       <div className="grid grid-cols-1 gap-4">
-        {bottomThree.map(({ rank, teamName, manager, points }, index) => (
+        {isLoading ? (
+          // Loading skeleton
+          [1, 2, 3].map(i => (
+            <div key={i} className="bg-[#3D195B] border-2 border-[#00E0D3]/60 rounded-xl p-4">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-full bg-gray-600 animate-pulse"></div>
+                <div className="flex-1 space-y-2">
+                  <div className="h-4 bg-gray-600 rounded animate-pulse"></div>
+                  <div className="h-3 bg-gray-600 rounded w-2/3 animate-pulse"></div>
+                </div>
+                <div className="w-16 h-12 bg-gray-600 rounded-lg animate-pulse"></div>
+              </div>
+            </div>
+          ))
+        ) : (
+          bottomThree.map(({ rank, teamName, manager, points }, index) => (
           <div
             key={rank}
             className={`
@@ -56,7 +71,7 @@ const BottomThreeSection: React.FC<BottomThreeSectionProps> = ({ bottomThree, is
               </div>
             </div>
           </div>
-        ))}
+        )))}
       </div>
     </section>
   );
