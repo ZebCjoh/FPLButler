@@ -91,22 +91,42 @@ const GameweekView: React.FC<GameweekViewProps> = ({ gameweekId, onBackToHome })
     );
   }
 
-  // Transform historical data into the same format as App.tsx
-  const topThree = gameweekData.top3 ? gameweekData.top3.map((team: any, index: number) => ({
-    rank: index + 1,
-    teamName: team.teamName || team.entry_name,
-    manager: team.manager || team.player_name,
-    points: team.points || team.total
-  })) : [];
+  // Transform historical data into the same format as App.tsx (robust to key variations)
+  const rawTop = gameweekData.top3 || gameweekData.topThree || gameweekData.top || [];
+  const rawBottom = gameweekData.bottom3 || gameweekData.bottomThree || gameweekData.bottom || [];
 
-  const bottomThree = gameweekData.bottom3 ? gameweekData.bottom3.map((team: any, index: number) => ({
-    rank: team.rank || (gameweekData.top3?.length || 0) - 2 + index,
-    teamName: team.teamName || team.entry_name,
-    manager: team.manager || team.player_name,
-    points: team.points || team.total
-  })) : [];
+  const topThree = Array.isArray(rawTop)
+    ? rawTop.map((team: any, index: number) => ({
+        rank: team.rank ?? index + 1,
+        teamName: team.teamName || team.entry_name || team.team || '-',
+        manager: team.manager || team.player_name || team.managerName || '-',
+        points: team.points ?? team.total ?? team.event_total ?? 0,
+      }))
+    : [];
 
-  const leagueName = gameweekData.top3?.[0]?.league_name || gameweekData.summary?.leagueName || 'Historisk Liga';
+  const bottomThree = Array.isArray(rawBottom)
+    ? rawBottom.map((team: any, index: number) => ({
+        rank: team.rank ?? ((Array.isArray(rawTop) ? rawTop.length : 3) - 2 + index),
+        teamName: team.teamName || team.entry_name || team.team || '-',
+        manager: team.manager || team.player_name || team.managerName || '-',
+        points: team.points ?? team.total ?? team.event_total ?? 0,
+      }))
+    : [];
+
+  const leagueName = (rawTop?.[0]?.league_name)
+    || gameweekData.leagueName
+    || gameweekData.summary?.leagueName
+    || 'Historisk Liga';
+
+  const summaryText = typeof gameweekData.summary === 'string'
+    ? gameweekData.summary
+    : (gameweekData.summary?.text || '');
+
+  const highlights = gameweekData.highlights
+    || gameweekData.weeklyStats?.highlights
+    || [];
+
+  const weeklyStats = gameweekData.weeklyStats || gameweekData.weekly || null;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#9B27E8] via-[#3E9BF9] to-[#00E0D3] relative overflow-hidden">
@@ -122,7 +142,7 @@ const GameweekView: React.FC<GameweekViewProps> = ({ gameweekId, onBackToHome })
 
         {/* IDENTICAL Butler's Assessment Section */}
         <ButlerAssessment 
-          assessment={gameweekData.summary || ''} 
+          assessment={summaryText} 
           isLoading={false} 
         />
 
@@ -144,16 +164,16 @@ const GameweekView: React.FC<GameweekViewProps> = ({ gameweekId, onBackToHome })
 
             {/* IDENTICAL Highlights Section */}
             <HighlightsSection 
-              highlights={gameweekData.highlights || []} 
+              highlights={highlights || []} 
               isLoading={false} 
             />
           </div>
 
           {/* Right Column - Weekly Stats */}
           <div className="space-y-4">
-            {gameweekData.weeklyStats && (
+            {weeklyStats && (
               <WeeklyStatsSection 
-                weeklyStats={gameweekData.weeklyStats} 
+                weeklyStats={weeklyStats} 
                 currentGameweek={parseInt(gameweekId)} 
                 isLoading={false} 
               />
