@@ -194,7 +194,7 @@ const FPLDashboard: React.FC<FPLDashboardProps> = ({ data, isHistorical = false,
                 </div>
                 
                 <div className="grid grid-cols-1 gap-4">
-                  {bottomThree.map(({ rank, teamName, manager, points }, index) => (
+                  {bottomThree.map(({ rank, teamName, manager, points }) => (
                     <div
                       key={rank}
                       className="bg-[#3D195B] border-2 border-red-500/70 rounded-xl shadow-xl p-4 flex items-center space-x-4"
