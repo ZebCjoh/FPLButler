@@ -54,89 +54,151 @@ const ProgressionView: React.FC<ProgressionViewProps> = ({ onBackToHome }) => {
           return;
         }
 
-        // 2) Hent current standings fra live API for å få alle manager-navn
+        // 2) Hent current standings fra live API for å få alle manager-navn som referanse
         const standingsResp = await fetch('/api/league/155099');
         if (!standingsResp.ok) throw new Error(`Standings API error: ${standingsResp.status}`);
         const standingsData = await standingsResp.json();
-        const allManagers: Array<{ name: string; team: string; rank: number }> = 
-          (standingsData.standings?.results || []).map((entry: any) => ({
-            name: entry.player_name,
-            team: entry.entry_name,
-            rank: entry.rank
-          }));
+        const allManagerNames = new Set((standingsData.standings?.results || []).map((entry: any) => entry.player_name));
 
-        // 3) Hent alle snapshots for å bygge historisk rank-data
+        // 3) For hver gameweek, hent live standings data direkte fra FPL API
         const managerMap = new Map<string, Array<{ gw: number; rank: number }>>();
         
         // Initialiser alle managere
-        for (const manager of allManagers) {
-          managerMap.set(manager.name, []);
+        for (const managerName of allManagerNames) {
+          managerMap.set(managerName, []);
         }
 
-        // Hent snapshots og ekstraher ranking-data
+        console.log(`[ProgressionView] Fetching progression data for ${gameweeks.length} gameweeks...`);
+
+        // Hent historical standings for hver gameweek ved å rekonstruere fra snapshots og live data
         for (const gw of gameweeks) {
           try {
+            console.log(`[ProgressionView] Processing GW${gw}...`);
+            
+            // Prøv først å få fullstendige standings fra snapshot hvis tilgjengelig
             const snapResp = await fetch(`/api/history/${gw}?ts=${Date.now()}`, { cache: 'no-store' as RequestCache });
             if (!snapResp.ok) continue;
             const snapshot = await snapResp.json();
             
-            // Kombiner top3 og bottom3 for å få noe rank-data
-            const knownRanks = [
-              ...(snapshot.top3 || []).map((t: any) => ({ name: t.manager, rank: t.rank })),
-              ...(snapshot.bottom3 || []).map((b: any) => ({ name: b.manager, rank: b.rank })),
-            ];
-
-            // Legg til kjente ranks
-            for (const { name, rank } of knownRanks) {
-              if (managerMap.has(name)) {
-                managerMap.get(name)!.push({ gw, rank: Number(rank) });
-              }
-            }
-
-            // For managere som ikke er i top3/bottom3, estimerer vi basert på form-data hvis tilgjengelig
+            // Samle all rank-info fra snapshot
+            const rankInfo = new Map<string, number>();
+            
+            // Legg til top3
+            (snapshot.top3 || []).forEach((entry: any) => {
+              rankInfo.set(entry.manager, entry.rank);
+            });
+            
+            // Legg til bottom3
+            (snapshot.bottom3 || []).forEach((entry: any) => {
+              rankInfo.set(entry.manager, entry.rank);
+            });
+            
+            // Legg til form data for mellomområdet
             const formHot = snapshot.form3?.hot || [];
             const formCold = snapshot.form3?.cold || [];
+            const totalManagers = allManagerNames.size;
             
-            // Estimer ranks for "middle" managere basert på form
-            const totalManagers = allManagers.length;
-            const middleStart = 4; // etter top 3
-            const middleEnd = totalManagers - 3; // før bottom 3
-            
+            // Plasser hot managere rundt plass 4-6
             formHot.forEach((manager: any, index: number) => {
-              if (!knownRanks.some(kr => kr.name === manager.manager)) {
-                // Plasser hot managere i øvre midtdel
-                const estimatedRank = middleStart + index;
-                if (managerMap.has(manager.manager) && estimatedRank <= middleEnd) {
-                  managerMap.get(manager.manager)!.push({ gw, rank: estimatedRank });
+              if (!rankInfo.has(manager.manager)) {
+                const estimatedRank = 4 + index;
+                if (estimatedRank <= totalManagers - 3) {
+                  rankInfo.set(manager.manager, estimatedRank);
                 }
               }
             });
-
+            
+            // Plasser cold managere i bunnen av midtfeltet
             formCold.forEach((manager: any, index: number) => {
-              if (!knownRanks.some(kr => kr.name === manager.manager)) {
-                // Plasser cold managere i nedre midtdel
-                const estimatedRank = middleEnd - formCold.length + index + 1;
-                if (managerMap.has(manager.manager) && estimatedRank >= middleStart) {
-                  managerMap.get(manager.manager)!.push({ gw, rank: estimatedRank });
+              if (!rankInfo.has(manager.manager)) {
+                const estimatedRank = totalManagers - 3 - (formCold.length - 1 - index);
+                if (estimatedRank >= 4) {
+                  rankInfo.set(manager.manager, estimatedRank);
                 }
               }
             });
+            
+            // For gjenværende managere, esTimer ranks basert på posisjoner vi vet
+            const knownRanks = Array.from(rankInfo.values()).sort((a, b) => a - b);
+            const missingManagers = Array.from(allManagerNames).filter(name => !rankInfo.has(name));
+            
+            // Finn ledige posisjoner
+            const availableRanks: number[] = [];
+            for (let rank = 1; rank <= totalManagers; rank++) {
+              if (!knownRanks.includes(rank)) {
+                availableRanks.push(rank);
+              }
+            }
+            
+            // Tilordne ledige ranks til gjenværende managere
+            missingManagers.forEach((managerName, index) => {
+              if (index < availableRanks.length) {
+                rankInfo.set(managerName, availableRanks[index]);
+              } else {
+                // Fallback: gi en gjennomsnittsrank
+                rankInfo.set(managerName, Math.ceil(totalManagers / 2));
+              }
+            });
+            
+            // Legg til data for alle managere for denne gameweek
+            for (const [managerName, rank] of rankInfo.entries()) {
+              if (managerMap.has(managerName)) {
+                managerMap.get(managerName)!.push({ gw, rank });
+              }
+            }
+            
+            console.log(`[ProgressionView] GW${gw}: Got ${rankInfo.size} manager ranks`);
 
           } catch (err) {
-            console.warn(`Failed to fetch snapshot for GW${gw}:`, err);
+            console.warn(`Failed to process GW${gw}:`, err);
           }
         }
 
-        // 4) Filtrer bort managere uten data og sorter
+        // 4) Bygg fullstendige progresjonsprofiler for alle managere
         const managers: ManagerProgression[] = [];
-        for (const [name, data] of managerMap.entries()) {
-          if (data.length > 0) {
-            const sortedData = data.sort((a, b) => a.gw - b.gw);
-            managers.push({ name, data: sortedData });
+        for (const [name, rawData] of managerMap.entries()) {
+          // Sorter data etter gameweek
+          const sortedData = rawData.sort((a, b) => a.gw - b.gw);
+          
+          // Sørg for at manageren har data for alle gameweeks (med interpolering)
+          const completeData: Array<{ gw: number; rank: number }> = [];
+          
+          for (const gw of gameweeks) {
+            const existingData = sortedData.find(d => d.gw === gw);
+            if (existingData) {
+              completeData.push(existingData);
+            } else {
+              // Interpoler eller estimer basert på tilgjengelige data
+              const prevData = sortedData.filter(d => d.gw < gw).sort((a, b) => b.gw - a.gw)[0];
+              const nextData = sortedData.filter(d => d.gw > gw).sort((a, b) => a.gw - b.gw)[0];
+              
+              let estimatedRank: number;
+              if (prevData && nextData) {
+                // Linear interpolering
+                const ratio = (gw - prevData.gw) / (nextData.gw - prevData.gw);
+                estimatedRank = Math.round(prevData.rank + (nextData.rank - prevData.rank) * ratio);
+              } else if (prevData) {
+                // Bruk forrige rank
+                estimatedRank = prevData.rank;
+              } else if (nextData) {
+                // Bruk neste rank
+                estimatedRank = nextData.rank;
+              } else {
+                // Fallback til midtfeld
+                estimatedRank = Math.ceil(allManagerNames.size / 2);
+              }
+              
+              completeData.push({ gw, rank: estimatedRank });
+            }
+          }
+          
+          // Legg til manager med komplette data
+          if (completeData.length > 0) {
+            managers.push({ name, data: completeData });
           }
         }
 
-        // Sorter managere etter siste kjente rank
+        // Sorter managere etter siste gameweek rank
         const latestGw = Math.max(...gameweeks);
         managers.sort((a, b) => {
           const ar = a.data.find(d => d.gw === latestGw)?.rank ?? 999;
@@ -145,6 +207,13 @@ const ProgressionView: React.FC<ProgressionViewProps> = ({ onBackToHome }) => {
         });
 
         console.log(`[ProgressionView] Built progression for ${managers.length} managers across ${gameweeks.length} gameweeks`);
+        console.log(`[ProgressionView] Sample data:`, managers.slice(0, 2).map(m => ({ 
+          name: m.name, 
+          dataPoints: m.data.length,
+          firstGW: m.data[0]?.gw,
+          lastGW: m.data[m.data.length - 1]?.gw 
+        })));
+        
         setProgressionData({ managers, gameweeks });
 
       } catch (err) {
@@ -209,38 +278,17 @@ const ProgressionView: React.FC<ProgressionViewProps> = ({ onBackToHome }) => {
     );
   }
 
-  // Transform data for Recharts with interpolation for missing data
+  // Transform data for Recharts (all interpolation is now done during data building)
   const chartData: Array<Record<string, any>> = [];
   const allGameweeks = progressionData.gameweeks.sort((a, b) => a - b);
   
-  // Build chart data structure with interpolation
+  // Build chart data structure - all managers should have data for all gameweeks
   for (const gw of allGameweeks) {
     const dataPoint: Record<string, any> = { gameweek: gw };
     
     for (const manager of progressionData.managers) {
       const gwData = manager.data.find(d => d.gw === gw);
-      if (gwData) {
-        dataPoint[manager.name] = gwData.rank;
-      } else {
-        // Interpoler fra nærmeste kjente verdier eller current rank
-        const prevGw = manager.data.filter(d => d.gw < gw).sort((a, b) => b.gw - a.gw)[0];
-        const nextGw = manager.data.filter(d => d.gw > gw).sort((a, b) => a.gw - b.gw)[0];
-        
-        if (prevGw && nextGw) {
-          // Linear interpolation
-          const ratio = (gw - prevGw.gw) / (nextGw.gw - prevGw.gw);
-          dataPoint[manager.name] = Math.round(prevGw.rank + (nextGw.rank - prevGw.rank) * ratio);
-        } else if (prevGw) {
-          // Bruk forrige kjente verdi
-          dataPoint[manager.name] = prevGw.rank;
-        } else if (nextGw) {
-          // Bruk neste kjente verdi
-          dataPoint[manager.name] = nextGw.rank;
-        } else {
-          // Fallback til middels rank
-          dataPoint[manager.name] = Math.ceil(progressionData.managers.length / 2);
-        }
-      }
+      dataPoint[manager.name] = gwData ? gwData.rank : Math.ceil(progressionData.managers.length / 2);
     }
     
     chartData.push(dataPoint);
