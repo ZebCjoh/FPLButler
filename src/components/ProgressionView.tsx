@@ -364,7 +364,7 @@ const ProgressionView: React.FC<ProgressionViewProps> = ({ onBackToHome }) => {
                 margin={{
                   top: 48,
                   right: isMobile ? 24 : 120,
-                  left: 56,
+                  left: isMobile ? 56 : 80,
                   bottom: isMobile ? 84 : 56,
                 }}
               >
