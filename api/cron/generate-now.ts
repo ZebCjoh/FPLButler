@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import type { Snapshot } from '../../types/snapshot';
-import { calculateDifferentialHero } from '../../src/logic/differentialHero';
+import { calculateDifferentialHero } from '../../lib/differentialHero';
 
 interface FPLElement {
   id: number;
