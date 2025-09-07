@@ -53,7 +53,7 @@ async function safeJson(url: string): Promise<any> {
 }
 
 function generateButlerAssessment(snapshot: Snapshot): string {
-  const { weekly, form3 } = snapshot;
+  const { weekly } = snapshot;
   
   const hash = (s: string) => {
     let h = 2166136261;
@@ -386,6 +386,9 @@ export async function composeSnapshot(leagueId: string, gameweek: number): Promi
   };
   
   // 11. Build snapshot
+  const diffPlayer: string = diffCandidate ? (elementIdToName[diffCandidate.id] || `#${diffCandidate.id}`) : '-';
+  const diffPoints: number = diffCandidate ? diffCandidate.points : 0;
+
   const snapshot: Snapshot = {
     meta: {
       leagueId,
@@ -475,8 +478,8 @@ export async function composeSnapshot(leagueId: string, gameweek: number): Promi
       { id: 3, text: `Største bevegelse: ${riser?.manager || '-'} (+${Math.max(0, riser?.change || 0)} plasser)` }
     ],
     differentialHero: {
-      player: diffCandidate ? elementIdToName[diffCandidate.id] || `#${diffCandidate.id}` : '-',
-      points: diffCandidate?.points || 0,
+      player: diffPlayer,
+      points: diffPoints,
       ownership: diffOwners.length,
       ownedBy: diffOwners,
       managers: diffManagers
