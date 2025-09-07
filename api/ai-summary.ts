@@ -1,6 +1,5 @@
 import { put, list } from '@vercel/blob';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { composeSnapshot } from '../lib/snapshot';
 import type { Snapshot } from '../types/snapshot';
 
 interface HistoryEntry {
@@ -104,8 +103,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           return res.status(400).json({ error: 'Missing gameweek in request body' });
         }
         
-        console.log(`[ai-summary] Generating snapshot for league ${leagueId}, GW ${gameweek}`);
-        snapshot = await composeSnapshot(leagueId, gameweek);
+        // For now, require snapshot to be provided
+        return res.status(400).json({ 
+          error: 'Snapshot must be provided in request body',
+          details: 'Pass complete snapshot object in POST body'
+        });
       }
       
       // Save current AI summary (simple format for compatibility)
