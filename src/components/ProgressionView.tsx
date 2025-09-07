@@ -279,42 +279,50 @@ const ProgressionView: React.FC<ProgressionViewProps> = ({ onBackToHome }) => {
         </div>
 
         {/* Chart Container */}
-        <div className="bg-[#3D195B] border-2 border-[#00E0D3]/60 rounded-2xl p-6 mb-6">
-          <div className="relative h-[540px] w-full">
-            {/* Custom Y-axis label overlay to avoid extra reserved width */}
-            <div className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 -rotate-90 text-white/80 text-xs">
-              Tabellplassering
+        <div className="bg-[#3D195B] border-2 border-[#00E0D3]/60 rounded-2xl p-4 mb-6">
+          <div className="relative h-[450px] md:h-[540px] w-full">
+            {/* Custom Y-axis label overlay - positioned better for mobile */}
+            <div className="pointer-events-none absolute left-1 top-1/2 -translate-y-1/2 -rotate-90 text-white/80 text-xs">
+              {isMobile ? 'Rank' : 'Tabellplassering'}
             </div>
             <ResponsiveContainer width="100%" height="100%">
               <LineChart
                 data={chartData}
                 margin={{
-                  top: 48,
-                  right: 80,
-                  left: 80,
-                  bottom: 88,
+                  top: isMobile ? 24 : 48,
+                  right: isMobile ? 16 : 80,
+                  left: isMobile ? 40 : 80,
+                  bottom: isMobile ? 180 : 88,
                 }}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#ffffff20" />
                 <XAxis 
                   dataKey="gameweek" 
                   stroke="#ffffff80"
-                  fontSize={12}
-                  label={{ value: 'Gameweek', position: 'insideBottom', offset: -10, style: { fill: '#ffffff80' } }}
+                  fontSize={isMobile ? 10 : 12}
+                  label={{ 
+                    value: 'Gameweek', 
+                    position: 'insideBottom', 
+                    offset: isMobile ? -5 : -10, 
+                    style: { fill: '#ffffff80', fontSize: isMobile ? '10px' : '12px' } 
+                  }}
                 />
                 <YAxis 
                   stroke="#ffffff80"
-                  fontSize={12}
+                  fontSize={isMobile ? 10 : 12}
                   domain={[1, maxRank]}
                   reversed={true}
-                  width={isMobile ? 44 : 56}
+                  width={isMobile ? 28 : 56}
                 />
                 <Tooltip content={<CustomTooltip />} />
                 <Legend 
                   wrapperStyle={{
-                    paddingTop: '12px',
-                    fontSize: '12px',
+                    paddingTop: isMobile ? '8px' : '12px',
+                    fontSize: isMobile ? '10px' : '12px',
                     color: '#ffffff',
+                    lineHeight: isMobile ? '14px' : '18px',
+                    maxHeight: isMobile ? '140px' : 'none',
+                    overflowY: isMobile ? 'auto' : 'visible',
                   }}
                   layout="horizontal"
                   align="center"
@@ -332,10 +340,10 @@ const ProgressionView: React.FC<ProgressionViewProps> = ({ onBackToHome }) => {
                       type="monotone"
                       dataKey={manager.name}
                       stroke={colors[index]}
-                      strokeWidth={isHovered ? 3 : 1.5}
+                      strokeWidth={isHovered ? (isMobile ? 2.5 : 3) : (isMobile ? 1.2 : 1.5)}
                       strokeOpacity={shouldFade ? 0.3 : 1}
-                      dot={{ r: 2, fillOpacity: shouldFade ? 0.3 : 1 }}
-                      activeDot={{ r: 6, strokeWidth: 2 }}
+                      dot={{ r: isMobile ? 1.5 : 2, fillOpacity: shouldFade ? 0.3 : 1 }}
+                      activeDot={{ r: isMobile ? 4 : 6, strokeWidth: isMobile ? 1.5 : 2 }}
                       connectNulls={false}
                     />
                   );
