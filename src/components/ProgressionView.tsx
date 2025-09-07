@@ -87,18 +87,20 @@ const ProgressionView: React.FC<ProgressionViewProps> = ({ onBackToHome }) => {
               if (!resp.ok) throw new Error(`history ${m.entryId}: ${resp.status}`);
               const data = await resp.json();
               const totals = new Map<number, number>();
+              const gwPoints = new Map<number, number>();
               const cumulativeTransfers = new Map<number, number>();
               let runningTransfers = 0;
               (data.current || []).forEach((ev: any) => {
                 const gw = Number(ev.event);
                 totals.set(gw, Number(ev.total_points) || 0);
+                gwPoints.set(gw, Number(ev.points) || 0);
                 runningTransfers += Number(ev.event_transfers) || 0;
                 cumulativeTransfers.set(gw, runningTransfers);
               });
-              return { name: m.name, entryId: m.entryId, totals, cumulativeTransfers };
+              return { name: m.name, entryId: m.entryId, totals, gwPoints, cumulativeTransfers };
             } catch (e) {
               console.warn(`[ProgressionView] Failed fetching history for ${m.entryId}`, e);
-              return { name: m.name, entryId: m.entryId, totals: new Map<number, number>(), cumulativeTransfers: new Map<number, number>() };
+              return { name: m.name, entryId: m.entryId, totals: new Map<number, number>(), gwPoints: new Map<number, number>(), cumulativeTransfers: new Map<number, number>() };
             }
           })
         );
@@ -110,13 +112,15 @@ const ProgressionView: React.FC<ProgressionViewProps> = ({ onBackToHome }) => {
         for (const gw of gameweeks) {
           const ranking = managerHistories.map(h => ({
             name: h.name,
-            entryId: managerMeta.find(mm => mm.name === h.name)?.entryId ?? 99999999,
+            entryId: h.entryId,
             total: h.totals.get(gw) ?? 0,
+            gwPts: h.gwPoints.get(gw) ?? 0,
             transfers: h.cumulativeTransfers.get(gw) ?? 0,
           }));
 
           ranking.sort((a, b) => {
             if (b.total !== a.total) return b.total - a.total; // highest total first
+            if (b.gwPts !== a.gwPts) return b.gwPts - a.gwPts; // higher GW points first
             if (a.transfers !== b.transfers) return a.transfers - b.transfers; // fewer transfers first
             return a.entryId - b.entryId; // earlier registration (lower id) first
           });
@@ -135,6 +139,18 @@ const ProgressionView: React.FC<ProgressionViewProps> = ({ onBackToHome }) => {
           const br = b.data.find(d => d.gw === latestGw)?.rank ?? 999;
           return ar - br;
         });
+
+        // Debug: log computed order for each GW (top 10)
+        try {
+          const debugGws = gameweeks;
+          debugGws.forEach(gw => {
+            const order = managers
+              .map(m => ({ name: m.name, rank: m.data.find(d => d.gw === gw)?.rank }))
+              .sort((a, b) => (a.rank ?? 999) - (b.rank ?? 999))
+              .slice(0, 10);
+            console.log(`[ProgressionView] GW${gw} top10`, order);
+          });
+        } catch {}
 
         setProgressionData({ managers, gameweeks });
 
