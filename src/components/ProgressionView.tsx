@@ -36,7 +36,6 @@ const ProgressionView: React.FC<ProgressionViewProps> = ({ onBackToHome }) => {
   const [progressionData, setProgressionData] = useState<ProgressionData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showLegend, setShowLegend] = useState(false);
 
   useEffect(() => {
     const fetchProgressionData = async () => {
@@ -339,17 +338,9 @@ const ProgressionView: React.FC<ProgressionViewProps> = ({ onBackToHome }) => {
           <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">
             📈 Utvikling i tabellen
           </h1>
-          <p className="text-white/80 text-sm mb-4">
+          <p className="text-white/80 text-sm">
             Følg hvordan alle managerne har beveget seg i tabellen over tid
           </p>
-          
-          {/* Legend Toggle */}
-          <button
-            onClick={() => setShowLegend(!showLegend)}
-            className="bg-[#3D195B] border border-[#00E0D3]/60 text-white px-4 py-2 rounded-lg hover:bg-[#00E0D3]/20 transition-all duration-300 text-sm"
-          >
-            {showLegend ? '🙈 Skjul navneliste' : '👁️ Vis navneliste'}
-          </button>
         </div>
 
         {/* Chart Container */}
@@ -360,9 +351,9 @@ const ProgressionView: React.FC<ProgressionViewProps> = ({ onBackToHome }) => {
                 data={chartData}
                 margin={{
                   top: 20,
-                  right: 30,
+                  right: 200,
                   left: 40,
-                  bottom: showLegend ? 140 : 60,
+                  bottom: 40,
                 }}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#ffffff20" />
@@ -380,22 +371,20 @@ const ProgressionView: React.FC<ProgressionViewProps> = ({ onBackToHome }) => {
                   label={{ value: 'Tabellplassering', angle: -90, position: 'insideLeft', style: { fill: '#ffffff80' } }}
                 />
                 <Tooltip content={<CustomTooltip />} />
-                {showLegend && (
-                  <Legend 
-                    wrapperStyle={{ 
-                      color: '#ffffff',
-                      fontSize: '10px',
-                      paddingTop: '20px',
-                      maxHeight: '120px',
-                      overflowY: 'auto'
-                    }}
-                    iconType="line"
-                    layout="horizontal"
-                    align="center"
-                    verticalAlign="bottom"
-                    height={showLegend ? 120 : 0}
-                  />
-                )}
+                <Legend 
+                  wrapperStyle={{ 
+                    color: '#ffffff',
+                    fontSize: '11px',
+                    paddingLeft: '10px',
+                    paddingRight: '10px'
+                  }}
+                  iconType="line"
+                  layout="vertical"
+                  align="right"
+                  verticalAlign="middle"
+                  width={180}
+                  itemGap={14}
+                />
                 {progressionData.managers.map((manager, index) => (
                   <Line
                     key={manager.name}
