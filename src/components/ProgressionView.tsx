@@ -58,14 +58,16 @@ const ProgressionView: React.FC<ProgressionViewProps> = ({ onBackToHome }) => {
         const standingsResp = await fetch('/api/league/155099');
         if (!standingsResp.ok) throw new Error(`Standings API error: ${standingsResp.status}`);
         const standingsData = await standingsResp.json();
-        const allManagerNames = new Set((standingsData.standings?.results || []).map((entry: any) => entry.player_name));
+        const allManagerNames: Set<string> = new Set<string>(
+          ((standingsData.standings?.results || []) as Array<any>).map((entry: any) => String(entry.player_name))
+        );
 
         // 3) For hver gameweek, hent live standings data direkte fra FPL API
         const managerMap = new Map<string, Array<{ gw: number; rank: number }>>();
         
         // Initialiser alle managere
-        for (const managerName of allManagerNames) {
-          managerMap.set(managerName, []);
+        for (const managerName of Array.from(allManagerNames.values())) {
+          managerMap.set(String(managerName), []);
         }
 
         console.log(`[ProgressionView] Fetching progression data for ${gameweeks.length} gameweeks...`);
@@ -120,7 +122,7 @@ const ProgressionView: React.FC<ProgressionViewProps> = ({ onBackToHome }) => {
             
             // For gjenværende managere, esTimer ranks basert på posisjoner vi vet
             const knownRanks = Array.from(rankInfo.values()).sort((a, b) => a - b);
-            const missingManagers = Array.from(allManagerNames).filter(name => !rankInfo.has(name));
+            const missingManagers = Array.from(allManagerNames.values()).filter((name: string) => !rankInfo.has(name));
             
             // Finn ledige posisjoner
             const availableRanks: number[] = [];
@@ -131,19 +133,20 @@ const ProgressionView: React.FC<ProgressionViewProps> = ({ onBackToHome }) => {
             }
             
             // Tilordne ledige ranks til gjenværende managere
-            missingManagers.forEach((managerName, index) => {
+            missingManagers.forEach((managerName: string, index: number) => {
               if (index < availableRanks.length) {
-                rankInfo.set(managerName, availableRanks[index]);
+                rankInfo.set(String(managerName), availableRanks[index]);
               } else {
                 // Fallback: gi en gjennomsnittsrank
-                rankInfo.set(managerName, Math.ceil(totalManagers / 2));
+                rankInfo.set(String(managerName), Math.ceil(totalManagers / 2));
               }
             });
             
             // Legg til data for alle managere for denne gameweek
             for (const [managerName, rank] of rankInfo.entries()) {
-              if (managerMap.has(managerName)) {
-                managerMap.get(managerName)!.push({ gw, rank });
+              const key = String(managerName);
+              if (managerMap.has(key)) {
+                managerMap.get(key)!.push({ gw, rank });
               }
             }
             
