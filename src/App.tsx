@@ -9,7 +9,6 @@ import TopThreeSection from './components/TopThreeSection';
 import BottomThreeSection from './components/BottomThreeSection';
 import HighlightsSection from './components/HighlightsSection';
 import WeeklyStatsSection from './components/WeeklyStatsSection';
-import InfoSection from './components/InfoSection';
 
 export const App = () => {
   const [standings, setStandings] = useState<any[]>([]);
@@ -25,7 +24,7 @@ export const App = () => {
   const [butlerAssessment, setButlerAssessment] = useState<string>('');
   const [historyData, setHistoryData] = useState<any[]>([]);
   const [currentView, setCurrentView] = useState<'home' | 'gameweek' | 'progression'>('home');
-  const [selectedGameweek, setSelectedGameweek] = useState<string>('');
+  const [selectedGameweek, setSelectedGameweek] = useState<number | null>(null);
 
   // Dynamiske høydepunkter kommer fra metrics.getHighlights i weeklyStats.highlights
 
@@ -459,11 +458,11 @@ export const App = () => {
   // Handle back to home navigation
   const handleBackToHome = () => {
     setCurrentView('home');
-    setSelectedGameweek('');
+    setSelectedGameweek(null);
   };
 
   // Render gameweek view if selected
-  if (currentView === 'gameweek') {
+  if (currentView === 'gameweek' && selectedGameweek !== null) {
     return (
       <GameweekView 
         gameweekId={selectedGameweek} 
@@ -540,7 +539,6 @@ export const App = () => {
                 isLoading={loadingStates.liveData} 
               />
 
-              <InfoSection />
 
               {/* Progression Button */}
               <section className="mt-8">
@@ -574,7 +572,7 @@ export const App = () => {
                         if (e.target.value) {
                           // Extract gameweek ID from URL (e.g., "/gw/1" -> "1")
                           const gwId = e.target.value.split('/').pop() || '';
-                          setSelectedGameweek(gwId);
+                          setSelectedGameweek(Number(gwId));
                           setCurrentView('gameweek');
                         }
                       }}
