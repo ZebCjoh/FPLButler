@@ -23,7 +23,7 @@ const GameweekView: React.FC<GameweekViewProps> = ({ gameweekId, onBackToHome })
         setLoading(true);
         setError(null);
         
-        const response = await fetch(`/api/history/${gameweekId}`);
+        const response = await fetch(`/api/history/${gameweekId}?ts=${Date.now()}`, { cache: 'no-store' as RequestCache });
         
         if (!response.ok) {
           if (response.status === 404) {
@@ -35,6 +35,7 @@ const GameweekView: React.FC<GameweekViewProps> = ({ gameweekId, onBackToHome })
         }
         
         const data = await response.json();
+        console.log('[GameweekView] Loaded snapshot for GW', gameweekId, data);
         setGameweekData(data);
         
       } catch (err) {
