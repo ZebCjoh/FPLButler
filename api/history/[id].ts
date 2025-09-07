@@ -27,10 +27,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     console.log(`[API] Fetching gameweek ${id} from Vercel Blob...`);
     
-    // Try to get gw-[id].json from blob
+    // Try to get gw-[id].json from blob (robust listing)
     const filename = `gw-${id}.json`;
-    const { blobs } = await list({ token, prefix: filename as any });
-    const gameweekBlob = blobs?.find((b: any) => b.pathname === filename);
+    // List by common prefix to avoid exact-match listing edge-cases
+    const { blobs } = await list({ token, prefix: 'gw-' as any });
+    const gameweekBlob = (blobs || []).find((b: any) => b.pathname === filename);
     
     if (!gameweekBlob) {
       console.log(`[API] No data found for gameweek ${id}`);
