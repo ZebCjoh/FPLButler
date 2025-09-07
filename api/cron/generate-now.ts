@@ -422,12 +422,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Send snapshot to ai-summary API for persistence
     const baseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://fpl-butler.vercel.app';
+    const requestBody = { snapshot };
+    console.log(`[generate-now] Sending snapshot to ai-summary, size: ${JSON.stringify(requestBody).length} bytes`);
+    
     const aiResponse = await fetch(`${baseUrl}/api/ai-summary`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ snapshot })
+      body: JSON.stringify(requestBody)
     });
     
     if (aiResponse.ok) {
