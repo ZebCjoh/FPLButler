@@ -398,8 +398,10 @@ const ProgressionView: React.FC<ProgressionViewProps> = ({ onBackToHome }) => {
                       dataKey={manager.name} 
                       position="right" 
                       content={(props: any) => {
-                        const { x, y, index: pointIndex, dataKey } = props;
-                        if (pointIndex === chartData.length - 1) {
+                        const { x, y, payload, dataKey } = props;
+                        const lastGw = allGameweeks[allGameweeks.length - 1];
+
+                        if (payload.gameweek === lastGw) {
                           return (
                             <text
                               x={x}
