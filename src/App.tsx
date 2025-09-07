@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { getHighlights } from './logic/metrics';
+import { calculateDifferentialHero } from './logic/differentialHero';
 import GameweekView from './components/GameweekView';
 import HeaderSection from './components/HeaderSection';
 import ButlerAssessment from './components/ButlerAssessment';
@@ -292,7 +293,7 @@ export const App = () => {
             };
           }).sort((a, b) => b.totalROI - a.totalROI);
 
-        // 4d) Differential hero within league (fewest owners, highest points)
+        // 4d) Differential hero within league (deterministic calculation)
         const ownershipCount: Record<number, number> = {};
         leagueEntriesWithLeague.forEach((row: any) => {
           const entryId = row.entry;
@@ -301,33 +302,6 @@ export const App = () => {
             ownershipCount[p.element] = (ownershipCount[p.element] || 0) + 1;
           });
         });
-        let diffCandidate: { id: number; owners: number; points: number } | null = null;
-        Object.keys(ownershipCount).forEach((idStr) => {
-          const id = Number(idStr);
-          const owners = ownershipCount[id];
-          const pts = pointsByElement[id] || 0;
-          if (owners > 0) {
-            if (
-              !diffCandidate ||
-              owners < (diffCandidate?.owners || Infinity) ||
-              (owners === diffCandidate?.owners && pts > (diffCandidate?.points || -1))
-            ) {
-              diffCandidate = { id, owners, points: pts };
-            }
-          }
-        });
-        const diffOwners: string[] = [];
-        const diffManagers: string[] = [];
-        if (diffCandidate) {
-          leagueEntriesWithLeague.forEach((row: any) => {
-            const entryId = row.entry;
-            const picks = picksByEntry[entryId]?.picks || [];
-            if (picks.some((p: any) => p.element === diffCandidate!.id)) {
-              diffOwners.push(row.entry_name);
-              diffManagers.push(row.player_name);
-            }
-          });
-        }
 
         // 5) Build weekly stats object
         const nextEvent = bootstrapData.events.find((e: any) => !e.finished && !e.is_current);
@@ -366,25 +340,14 @@ export const App = () => {
         }
         console.debug('Highlights:', highlights);
 
-        let differential: {
-          player: string;
-          points: number;
-          ownership: number;
-          owners: string[];
-          managers: string[];
-        };
-        if (diffCandidate !== null) {
-          const dc = diffCandidate as { id: number; owners: number; points: number };
-          differential = {
-            player: elementIdToName[dc.id] || `#${dc.id}`,
-            points: dc.points,
-            ownership: diffOwners.length,
-            owners: diffOwners,
-            managers: diffManagers,
-          };
-        } else {
-          differential = { player: '-', points: 0, ownership: 0, owners: [], managers: [] };
-        }
+        // Calculate differential hero using deterministic logic
+        const differential = calculateDifferentialHero(
+          ownershipCount,
+          pointsByElement,
+          elementIdToName,
+          leagueEntriesWithLeague,
+          picksByEntry
+        );
 
         const weekly = {
           weekWinner,
@@ -437,7 +400,13 @@ export const App = () => {
             genius: roiRows[0],
             flop: roiRows[roiRows.length - 1],
           },
-          differential,
+          differential: {
+            player: differential.player,
+            points: differential.points,
+            ownership: differential.ownership,
+            owners: differential.ownedBy,
+            managers: differential.managers
+          },
           highlights,
         };
 

@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import type { Snapshot } from '../../types/snapshot';
+import { calculateDifferentialHero } from '../../src/logic/differentialHero';
 
 interface FPLElement {
   id: number;
@@ -364,7 +365,7 @@ async function composeSnapshot(leagueId: string, gameweek: number): Promise<Snap
         };
       }).sort((a, b) => b.totalROI - a.totalROI);
 
-    // 12. Differential (fewest owners, tie-break on points)
+    // 12. Differential hero (deterministic calculation)
     const ownershipCount: Record<number, number> = {};
     standings.forEach((row: any) => {
       const entryId = row.entry;
@@ -373,34 +374,14 @@ async function composeSnapshot(leagueId: string, gameweek: number): Promise<Snap
         ownershipCount[p.element] = (ownershipCount[p.element] || 0) + 1;
       });
     });
-    let diffCandidate: { id: number; owners: number; points: number } | null = null;
-    Object.keys(ownershipCount).forEach((idStr) => {
-      const id = Number(idStr);
-      const owners = ownershipCount[id];
-      const pts = pointsByElement[id] || 0;
-      if (owners > 0) {
-        if (!diffCandidate || owners < diffCandidate.owners || (owners === diffCandidate.owners && pts > diffCandidate.points)) {
-          diffCandidate = { id, owners, points: pts };
-        }
-      }
-    });
-    let diffPlayer = '-';
-    let diffPoints = 0;
-    let diffOwners: string[] = [];
-    let diffManagers: string[] = [];
-    if (diffCandidate !== null) {
-      const dc: { id: number; owners: number; points: number } = diffCandidate as { id: number; owners: number; points: number };
-      diffPlayer = elementIdToName[dc.id] || `#${dc.id}`;
-      diffPoints = dc.points;
-      standings.forEach((row: any) => {
-        const entryId = row.entry;
-        const picks = picksByEntry[entryId]?.picks || [];
-        if (picks.some((p: any) => p.element === dc.id)) {
-          diffOwners.push(row.entry_name);
-          diffManagers.push(row.player_name);
-        }
-      });
-    }
+    
+    const differential = calculateDifferentialHero(
+      ownershipCount,
+      pointsByElement,
+      elementIdToName,
+      standings,
+      picksByEntry
+    );
     
     // 11. Next deadline
     const nextEvent = events.find(e => e.id === gameweek + 1);
@@ -535,11 +516,11 @@ async function composeSnapshot(leagueId: string, gameweek: number): Promise<Snap
         ];
       })(),
       differentialHero: {
-        player: diffPlayer,
-        points: diffPoints,
-        ownership: diffOwners.length,
-        ownedBy: diffOwners,
-        managers: diffManagers
+        player: differential.player,
+        points: differential.points,
+        ownership: differential.ownership,
+        ownedBy: differential.ownedBy,
+        managers: differential.managers
       }
     };
     
