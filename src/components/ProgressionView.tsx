@@ -67,154 +67,64 @@ const ProgressionView: React.FC<ProgressionViewProps> = ({ onBackToHome }) => {
           return;
         }
 
-        // 2) Hent current standings fra live API for å få alle manager-navn som referanse
-        const standingsResp = await fetch('/api/league/155099');
+        // 2) Hent standings for å få liste over managere og entryId
+        const standingsResp = await fetch('/api/league/155099', { cache: 'no-store' as RequestCache });
         if (!standingsResp.ok) throw new Error(`Standings API error: ${standingsResp.status}`);
         const standingsData = await standingsResp.json();
-        const allManagerNames: Set<string> = new Set<string>(
-          ((standingsData.standings?.results || []) as Array<any>).map((entry: any) => String(entry.player_name))
+        const standings = (standingsData.standings?.results || []) as Array<any>;
+        const managerMeta: Array<{ name: string; entryId: number }> = standings.map((r: any) => ({
+          name: String(r.player_name),
+          entryId: Number(r.entry),
+        }));
+
+        console.log(`[ProgressionView] Building progression from ${managerMeta.length} managers across ${gameweeks.length} gameweeks...`);
+
+        // 3) Hent historikk (totals) for hver manager og bygg opp totalpoeng per GW
+        const managerHistories = await Promise.all(
+          managerMeta.map(async (m) => {
+            try {
+              const resp = await fetch(`/api/entry/${m.entryId}/history?ts=${Date.now()}`, { cache: 'no-store' as RequestCache });
+              if (!resp.ok) throw new Error(`history ${m.entryId}: ${resp.status}`);
+              const data = await resp.json();
+              const totals = new Map<number, number>();
+              const gwPoints = new Map<number, number>();
+              (data.current || []).forEach((ev: any) => {
+                const gw = Number(ev.event);
+                totals.set(gw, Number(ev.total_points) || 0);
+                gwPoints.set(gw, Number(ev.points) || 0);
+              });
+              return { name: m.name, entryId: m.entryId, totals, gwPoints };
+            } catch (e) {
+              console.warn(`[ProgressionView] Failed fetching history for ${m.entryId}`, e);
+              return { name: m.name, entryId: m.entryId, totals: new Map<number, number>(), gwPoints: new Map<number, number>() };
+            }
+          })
         );
 
-        // 3) For hver gameweek, hent live standings data direkte fra FPL API
-        const managerMap = new Map<string, Array<{ gw: number; rank: number }>>();
-        
-        // Initialiser alle managere
-        for (const managerName of Array.from(allManagerNames.values())) {
-          managerMap.set(String(managerName), []);
-        }
+        // 4) Beregn liga-rank for hver GW ved å sortere på total points (tie-break: GW points)
+        const nameToSeries = new Map<string, Array<{ gw: number; rank: number }>>();
+        managerMeta.forEach(m => nameToSeries.set(m.name, []));
 
-        console.log(`[ProgressionView] Fetching progression data for ${gameweeks.length} gameweeks...`);
-
-        // Hent historical standings for hver gameweek ved å rekonstruere fra snapshots og live data
         for (const gw of gameweeks) {
-          try {
-            console.log(`[ProgressionView] Processing GW${gw}...`);
-            
-            // Prøv først å få fullstendige standings fra snapshot hvis tilgjengelig
-            const snapResp = await fetch(`/api/history/${gw}?ts=${Date.now()}`, { cache: 'no-store' as RequestCache });
-            if (!snapResp.ok) continue;
-            const snapshot = await snapResp.json();
-            
-            // Samle all rank-info fra snapshot
-            const rankInfo = new Map<string, number>();
-            
-            // Legg til top3
-            (snapshot.top3 || []).forEach((entry: any) => {
-              rankInfo.set(entry.manager, entry.rank);
-            });
-            
-            // Legg til bottom3
-            (snapshot.bottom3 || []).forEach((entry: any) => {
-              rankInfo.set(entry.manager, entry.rank);
-            });
-            
-            // Legg til form data for mellomområdet
-            const formHot = snapshot.form3?.hot || [];
-            const formCold = snapshot.form3?.cold || [];
-            const totalManagers = allManagerNames.size;
-            
-            // Plasser hot managere rundt plass 4-6
-            formHot.forEach((manager: any, index: number) => {
-              if (!rankInfo.has(manager.manager)) {
-                const estimatedRank = 4 + index;
-                if (estimatedRank <= totalManagers - 3) {
-                  rankInfo.set(manager.manager, estimatedRank);
-                }
-              }
-            });
-            
-            // Plasser cold managere i bunnen av midtfeltet
-            formCold.forEach((manager: any, index: number) => {
-              if (!rankInfo.has(manager.manager)) {
-                const estimatedRank = totalManagers - 3 - (formCold.length - 1 - index);
-                if (estimatedRank >= 4) {
-                  rankInfo.set(manager.manager, estimatedRank);
-                }
-              }
-            });
-            
-            // For gjenværende managere, esTimer ranks basert på posisjoner vi vet
-            const knownRanks = Array.from(rankInfo.values()).sort((a, b) => a - b);
-            const missingManagers = Array.from(allManagerNames.values()).filter((name: string) => !rankInfo.has(name));
-            
-            // Finn ledige posisjoner
-            const availableRanks: number[] = [];
-            for (let rank = 1; rank <= totalManagers; rank++) {
-              if (!knownRanks.includes(rank)) {
-                availableRanks.push(rank);
-              }
-            }
-            
-            // Tilordne ledige ranks til gjenværende managere
-            missingManagers.forEach((managerName: string, index: number) => {
-              if (index < availableRanks.length) {
-                rankInfo.set(String(managerName), availableRanks[index]);
-              } else {
-                // Fallback: gi en gjennomsnittsrank
-                rankInfo.set(String(managerName), Math.ceil(totalManagers / 2));
-              }
-            });
-            
-            // Legg til data for alle managere for denne gameweek
-            for (const [managerName, rank] of rankInfo.entries()) {
-              const key = String(managerName);
-              if (managerMap.has(key)) {
-                managerMap.get(key)!.push({ gw, rank });
-              }
-            }
-            
-            console.log(`[ProgressionView] GW${gw}: Got ${rankInfo.size} manager ranks`);
+          const ranking = managerHistories.map(h => ({
+            name: h.name,
+            total: h.totals.get(gw) ?? 0,
+            gwPts: h.gwPoints.get(gw) ?? 0,
+          }));
 
-          } catch (err) {
-            console.warn(`Failed to process GW${gw}:`, err);
-          }
+          ranking.sort((a, b) => {
+            if (b.total !== a.total) return b.total - a.total;
+            return b.gwPts - a.gwPts;
+          });
+
+          ranking.forEach((r, idx) => {
+            const arr = nameToSeries.get(r.name)!;
+            arr.push({ gw, rank: idx + 1 });
+          });
         }
 
-        // 4) Bygg fullstendige progresjonsprofiler for alle managere
-        const managers: ManagerProgression[] = [];
-        for (const [name, rawData] of managerMap.entries()) {
-          // Sorter data etter gameweek
-          const sortedData = rawData.sort((a, b) => a.gw - b.gw);
-          
-          // Sørg for at manageren har data for alle gameweeks (med interpolering)
-          const completeData: Array<{ gw: number; rank: number }> = [];
-          
-          for (const gw of gameweeks) {
-            const existingData = sortedData.find(d => d.gw === gw);
-            if (existingData) {
-              completeData.push(existingData);
-            } else {
-              // Interpoler eller estimer basert på tilgjengelige data
-              const prevData = sortedData.filter(d => d.gw < gw).sort((a, b) => b.gw - a.gw)[0];
-              const nextData = sortedData.filter(d => d.gw > gw).sort((a, b) => a.gw - b.gw)[0];
-              
-              let estimatedRank: number;
-              if (prevData && nextData) {
-                // Linear interpolering
-                const ratio = (gw - prevData.gw) / (nextData.gw - prevData.gw);
-                estimatedRank = Math.round(prevData.rank + (nextData.rank - prevData.rank) * ratio);
-              } else if (prevData) {
-                // Bruk forrige rank
-                estimatedRank = prevData.rank;
-              } else if (nextData) {
-                // Bruk neste rank
-                estimatedRank = nextData.rank;
-              } else {
-                // Fallback til midtfeld
-                estimatedRank = Math.ceil(allManagerNames.size / 2);
-              }
-              
-              completeData.push({ gw, rank: estimatedRank });
-            }
-          }
-          
-          // Legg til manager med komplette data
-          if (completeData.length > 0) {
-            managers.push({ name, data: completeData });
-          }
-        }
-
-        // Sorter managere etter siste gameweek rank
+        // 5) Pakk til komponentens datastruktur og sorter etter siste GW
+        const managers: ManagerProgression[] = Array.from(nameToSeries.entries()).map(([name, data]) => ({ name, data }));
         const latestGw = Math.max(...gameweeks);
         managers.sort((a, b) => {
           const ar = a.data.find(d => d.gw === latestGw)?.rank ?? 999;
@@ -222,14 +132,6 @@ const ProgressionView: React.FC<ProgressionViewProps> = ({ onBackToHome }) => {
           return ar - br;
         });
 
-        console.log(`[ProgressionView] Built progression for ${managers.length} managers across ${gameweeks.length} gameweeks`);
-        console.log(`[ProgressionView] Sample data:`, managers.slice(0, 2).map(m => ({ 
-          name: m.name, 
-          dataPoints: m.data.length,
-          firstGW: m.data[0]?.gw,
-          lastGW: m.data[m.data.length - 1]?.gw 
-        })));
-        
         setProgressionData({ managers, gameweeks });
 
       } catch (err) {
