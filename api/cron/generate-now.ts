@@ -184,7 +184,17 @@ async function composeSnapshot(leagueId: string, gameweek: number): Promise<Snap
   console.log(`[snapshot] Composing snapshot for league ${leagueId}, GW ${gameweek}`);
   
   try {
-    // 1. League standings only (minimize API calls)
+    // 1. Bootstrap data for players and next deadline
+    const bootstrapData: any = await fetchFPL(`https://fantasy.premierleague.com/api/bootstrap-static/`);
+    const elements = bootstrapData.elements as FPLElement[];
+    const events = bootstrapData.events as FPLEvent[];
+    
+    const elementIdToName: Record<number, string> = {};
+    elements.forEach((el) => {
+      elementIdToName[el.id] = el.web_name;
+    });
+    
+    // 2. League standings
     const leagueData: any = await fetchFPL(`https://fantasy.premierleague.com/api/leagues-classic/${leagueId}/standings/`);
     const standings = leagueData.standings.results as LeagueEntry[];
     
@@ -192,7 +202,14 @@ async function composeSnapshot(leagueId: string, gameweek: number): Promise<Snap
       throw new Error('No standings data found');
     }
     
-    // 2. Basic data
+    // 3. Live gameweek data for player points
+    const liveData: any = await fetchFPL(`https://fantasy.premierleague.com/api/event/${gameweek}/live/`);
+    const pointsByElement: Record<number, number> = {};
+    (liveData.elements || []).forEach((e: any) => {
+      pointsByElement[e.id] = e.stats.total_points;
+    });
+    
+    // 4. Basic standings data
     const top3 = standings.slice(0, 3).map((entry, idx) => ({
       rank: (idx + 1) as 1 | 2 | 3,
       team: entry.entry_name,
@@ -207,26 +224,24 @@ async function composeSnapshot(leagueId: string, gameweek: number): Promise<Snap
       points: entry.total
     }));
     
-    // Simulate weekly data based on standings
-    const weekWinner = {
-      team: standings[0].entry_name,
-      manager: standings[0].player_name,
-      points: Math.floor(Math.random() * 40) + 60
-    };
+    // 5. Weekly winner/loser (using event_total from standings)
+    const weekWinner = [...standings]
+      .map((row: any) => ({
+        team: row.entry_name,
+        manager: row.player_name,
+        points: row.event_total || 0,
+      }))
+      .sort((a, b) => b.points - a.points)[0];
+      
+    const weekLoser = [...standings]
+      .map((row: any) => ({
+        team: row.entry_name,
+        manager: row.player_name,
+        points: row.event_total || 0,
+      }))
+      .sort((a, b) => a.points - b.points)[0];
     
-    const weekLoser = {
-      team: standings[standings.length - 1].entry_name,
-      manager: standings[standings.length - 1].player_name,
-      points: Math.floor(Math.random() * 30) + 20
-    };
-    
-    const benchWarmer = {
-      manager: standings[Math.floor(Math.random() * standings.length)].player_name,
-      team: standings[Math.floor(Math.random() * standings.length)].entry_name,
-      benchPoints: Math.floor(Math.random() * 20) + 5
-    };
-    
-    // Movement simulation
+    // 6. Movements using rank vs last_rank
     const movements = standings.map(entry => ({
       manager: entry.player_name,
       team: entry.entry_name,
@@ -240,38 +255,147 @@ async function composeSnapshot(leagueId: string, gameweek: number): Promise<Snap
       (current.change < worst.change) ? current : worst
     );
     
-    // Form analysis
+    // 7. Form analysis - simplified version (real version would fetch per-entry history)
+    const formWindow = Math.min(3, gameweek);
     const formAnalysis = standings.map(entry => ({
       manager: entry.player_name,
       team: entry.entry_name,
-      points: Math.floor(Math.random() * 100) + 60
+      points: (entry.event_total || 0) * formWindow // Approximate form points
     }));
     const formSorted = [...formAnalysis].sort((a, b) => b.points - a.points);
     
-    // Transfer ROI
-    const samplePlayers = ['Haaland', 'Salah', 'Son', 'Kane', 'Palmer', 'Saka'];
-    const roiRows = [];
-    for (let i = 0; i < Math.min(5, standings.length); i++) {
-      const entry = standings[i];
-      const roi = Math.floor(Math.random() * 20) - 8;
-      roiRows.push({
-        manager: entry.player_name,
-        team: entry.entry_name,
-        totalROI: roi,
-        transfersIn: [{
-          name: samplePlayers[Math.floor(Math.random() * samplePlayers.length)],
-          points: roi
-        }]
-      });
+    // 8. Bench analysis - simplified (real version would fetch picks for all entries)
+    let benchWarmer = {
+      manager: 'Ikke tilgjengelig',
+      team: 'Ikke tilgjengelig',
+      benchPoints: 0
+    };
+    
+    // Try to get actual bench data for a few top entries
+    try {
+      for (const entry of standings.slice(0, 5)) {
+        try {
+          const picks: any = await safeJson(`https://fantasy.premierleague.com/api/entry/${entry.entry}/event/${gameweek}/picks/`);
+          if (picks?.picks) {
+            const bench = picks.picks
+              .filter((p: any) => p.multiplier === 0)
+              .reduce((sum: number, p: any) => sum + (pointsByElement[p.element] || 0), 0);
+            
+            if (bench > benchWarmer.benchPoints) {
+              benchWarmer = {
+                manager: entry.player_name,
+                team: entry.entry_name,
+                benchPoints: bench
+              };
+            }
+          }
+        } catch {
+          // Skip entries with no pick data
+        }
+      }
+    } catch {
+      // Fallback if bench analysis fails
     }
+    
+    // 9. Transfer ROI - simplified (real version would fetch all transfers)
+    const roiRows = [];
+    try {
+      for (const entry of standings.slice(0, 5)) {
+        try {
+          const transfers: any[] = await safeJson(`https://fantasy.premierleague.com/api/entry/${entry.entry}/transfers/`);
+          const gwTransfers = transfers.filter((t: any) => t.event === gameweek);
+          
+          let totalROI = 0;
+          const transfersIn: Array<{ name: string; points: number }> = [];
+          
+          for (const transfer of gwTransfers) {
+            const elementIn = transfer.element_in;
+            const points = pointsByElement[elementIn] || 0;
+            const cost = 4; // Standard transfer cost
+            const roi = points - cost;
+            totalROI += roi;
+            
+            transfersIn.push({
+              name: elementIdToName[elementIn] || `#${elementIn}`,
+              points: roi
+            });
+          }
+          
+          if (gwTransfers.length > 0) {
+            roiRows.push({
+              manager: entry.player_name,
+              team: entry.entry_name,
+              totalROI,
+              transfersIn
+            });
+          }
+        } catch {
+          // Skip entries without transfer data
+        }
+      }
+    } catch {
+      // Fallback if transfer analysis fails
+    }
+    
     roiRows.sort((a, b) => b.totalROI - a.totalROI);
     
-    // Differential
-    const sampleDiffPlayers = ['Watkins', 'Isak', 'Maddison', 'Bowen', 'Eze'];
-    const diffPlayer = sampleDiffPlayers[Math.floor(Math.random() * sampleDiffPlayers.length)];
-    const diffPoints = Math.floor(Math.random() * 10) + 8;
-    const diffOwners = standings.slice(0, Math.floor(Math.random() * 3) + 1).map(s => s.entry_name);
-    const diffManagers = standings.slice(0, Math.floor(Math.random() * 3) + 1).map(s => s.player_name);
+    // 10. Differential analysis - simplified
+    let diffPlayer = '-';
+    let diffPoints = 0;
+    let diffOwners: string[] = [];
+    let diffManagers: string[] = [];
+    
+    try {
+      const ownershipCount: Record<number, string[]> = {};
+      
+      // Sample a few entries to build ownership data
+      for (const entry of standings.slice(0, Math.min(10, standings.length))) {
+        try {
+          const picks: any = await safeJson(`https://fantasy.premierleague.com/api/entry/${entry.entry}/event/${gameweek}/picks/`);
+          if (picks?.picks) {
+            picks.picks.forEach((p: any) => {
+              if (!ownershipCount[p.element]) {
+                ownershipCount[p.element] = [];
+              }
+              ownershipCount[p.element].push(entry.entry_name);
+            });
+          }
+        } catch {
+          // Skip entries with no picks
+        }
+      }
+      
+      // Find low-ownership, high-scoring player
+      let bestDiff = { id: 0, owners: Infinity, points: 0 };
+      Object.entries(ownershipCount).forEach(([elementIdStr, owners]) => {
+        const elementId = Number(elementIdStr);
+        const points = pointsByElement[elementId] || 0;
+        
+        if (owners.length <= 3 && points > 6) {
+          if (owners.length < bestDiff.owners || (owners.length === bestDiff.owners && points > bestDiff.points)) {
+            bestDiff = { id: elementId, owners: owners.length, points };
+            diffPlayer = elementIdToName[elementId] || `#${elementId}`;
+            diffPoints = points;
+            diffOwners = owners;
+            diffManagers = owners; // Simplified
+          }
+        }
+      });
+    } catch {
+      // Fallback if differential analysis fails
+    }
+    
+    // 11. Next deadline
+    const nextEvent = events.find(e => e.id === gameweek + 1);
+    const nextDeadline = nextEvent ? {
+      gw: nextEvent.id,
+      date: new Date(nextEvent.deadline_time).toLocaleDateString('no-NO'),
+      time: new Date(nextEvent.deadline_time).toLocaleTimeString('no-NO', { hour: '2-digit', minute: '2-digit' })
+    } : {
+      gw: gameweek + 1,
+      date: 'TBA',
+      time: 'TBA'
+    };
 
     const snapshot: Snapshot = {
       meta: {
@@ -289,7 +413,7 @@ async function composeSnapshot(leagueId: string, gameweek: number): Promise<Snap
         winner: weekWinner,
         loser: weekLoser,
         benchWarmer,
-        chipsUsed: { count: 0, list: [] },
+        chipsUsed: { count: 0, list: [] }, // Simplified for now
         movements: {
           riser: {
             manager: riser.manager,
@@ -302,10 +426,10 @@ async function composeSnapshot(leagueId: string, gameweek: number): Promise<Snap
             delta: Math.min(0, faller.change)
           }
         },
-        nextDeadline: { gw: gameweek + 1, date: '2024-12-31', time: '18:30' }
+        nextDeadline
       },
       form3: {
-        window: 3,
+        window: formWindow,
         hot: formSorted.slice(0, 3).map(entry => ({
           manager: entry.manager,
           team: entry.team,
@@ -333,7 +457,7 @@ async function composeSnapshot(leagueId: string, gameweek: number): Promise<Snap
       },
       highlights: [
         { id: 1, text: `Rundens helt: ${weekWinner.manager} med ${weekWinner.points} poeng` },
-        { id: 2, text: `0 chips ble aktivert denne runden` },
+        { id: 2, text: `Benkesliter: ${benchWarmer.manager} med ${benchWarmer.benchPoints} poeng på benken` },
         { id: 3, text: `Største bevegelse: ${riser.manager} (+${Math.max(0, riser.change)} plasser)` }
       ],
       differentialHero: {
