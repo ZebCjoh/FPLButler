@@ -55,7 +55,7 @@ export async function getHighlights(gameweek: number, leagueId: number): Promise
     for (const group of chunk(entryIds, 6)) {
       await Promise.all(group.map(async (entryId) => {
         try {
-          const picks = await safeJson(`https://fantasy.premierleague.com/api/entry/${entryId}/event/${gameweek}/picks/`);
+          const picks = await safeJson(`/api/entry/${entryId}/event/${gameweek}/picks`);
           picksByEntry[entryId] = picks?.picks || [];
           chipByEntry[entryId] = picks?.active_chip || null;
           const cap = (picks?.picks || []).find((p: any) => p.is_captain);
@@ -92,7 +92,7 @@ export async function getHighlights(gameweek: number, leagueId: number): Promise
     // Fetch transfer data for all entries
     for (const entry of entries) {
       try {
-        const picks = await safeJson(`https://fantasy.premierleague.com/api/entry/${entry.entry}/event/${gameweek}/picks/`);
+        const picks = await safeJson(`/api/entry/${entry.entry}/event/${gameweek}/picks`);
         const transfers = picks?.entry_history?.event_transfers || 0;
         const transfersCost = picks?.entry_history?.event_transfers_cost || 0;
         

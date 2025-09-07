@@ -173,9 +173,9 @@ export const App = () => {
             group.map(async (entryId) => {
               try {
                 const [picks, history, transfers] = await Promise.all([
-                  safeJson(`https://fantasy.premierleague.com/api/entry/${entryId}/event/${currentGW}/picks/`).catch(() => null),
-                  safeJson(`https://fantasy.premierleague.com/api/entry/${entryId}/history/`).catch(() => null),
-                  safeJson(`https://fantasy.premierleague.com/api/entry/${entryId}/transfers/`).catch(() => []),
+                  safeJson(`/api/entry/${entryId}/event/${currentGW}/picks`).catch(() => null),
+                  safeJson(`/api/entry/${entryId}/history`).catch(() => null),
+                  safeJson(`/api/entry/${entryId}/transfers`).catch(() => []),
                 ]);
                 if (picks) picksByEntry[entryId] = picks;
                 if (history) historyByEntry[entryId] = history;
