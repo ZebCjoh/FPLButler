@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LabelList } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
 interface ManagerProgression {
   name: string;
@@ -37,6 +37,7 @@ const ProgressionView: React.FC<ProgressionViewProps> = ({ onBackToHome }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
+  const [hoveredManager, setHoveredManager] = useState<string | null>(null);
 
   // Check for mobile width
   useEffect(() => {
@@ -357,15 +358,15 @@ const ProgressionView: React.FC<ProgressionViewProps> = ({ onBackToHome }) => {
 
         {/* Chart Container */}
         <div className="bg-[#3D195B] border-2 border-[#00E0D3]/60 rounded-2xl p-6 mb-6">
-          <div className="h-[500px] w-full">
+          <div className="h-[600px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart
                 data={chartData}
                 margin={{
                   top: 48,
-                  right: isMobile ? 120 : 200,
+                  right: 48,
                   left: isMobile ? 56 : 100,
-                  bottom: isMobile ? 84 : 56,
+                  bottom: 120,
                 }}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#ffffff20" />
@@ -383,47 +384,36 @@ const ProgressionView: React.FC<ProgressionViewProps> = ({ onBackToHome }) => {
                   label={{ value: 'Tabellplassering', angle: -90, position: 'middle', style: { fill: '#ffffff80', textAnchor: 'middle' } }}
                 />
                 <Tooltip content={<CustomTooltip />} />
-                {progressionData.managers.map((manager, index) => (
-                  <Line
-                    key={manager.name}
-                    type="monotone"
-                    dataKey={manager.name}
-                    stroke={colors[index]}
-                    strokeWidth={1.5}
-                    dot={{ r: 2 }}
-                    activeDot={{ r: 6, strokeWidth: 2 }}
-                    connectNulls={false}
-                  >
-                    <LabelList 
-                      dataKey={manager.name} 
-                      position="right" 
-                      content={(props: any) => {
-                        try {
-                          const { x, y, payload } = props;
-                          const lastGw = allGameweeks[allGameweeks.length - 1];
-                          if (!payload || payload.gameweek !== lastGw || x == null || y == null) {
-                            return null;
-                          }
-                          return (
-                            <text
-                              x={x}
-                              y={y}
-                              dx={10}
-                              dy={4}
-                              fill={colors[index]}
-                              fontSize={12}
-                              textAnchor="start"
-                            >
-                              {manager.name}
-                            </text>
-                          );
-                        } catch {
-                          return null;
-                        }
-                      }}
+                <Legend 
+                  wrapperStyle={{
+                    paddingTop: '20px',
+                    fontSize: '12px',
+                    color: '#ffffff',
+                  }}
+                  layout="horizontal"
+                  align="center"
+                  verticalAlign="bottom"
+                  onMouseEnter={(entry: any) => setHoveredManager(entry.value)}
+                  onMouseLeave={() => setHoveredManager(null)}
+                />
+                {progressionData.managers.map((manager, index) => {
+                  const isHovered = hoveredManager === manager.name;
+                  const shouldFade = hoveredManager !== null && !isHovered;
+                  
+                  return (
+                    <Line
+                      key={manager.name}
+                      type="monotone"
+                      dataKey={manager.name}
+                      stroke={colors[index]}
+                      strokeWidth={isHovered ? 3 : 1.5}
+                      strokeOpacity={shouldFade ? 0.3 : 1}
+                      dot={{ r: 2, fillOpacity: shouldFade ? 0.3 : 1 }}
+                      activeDot={{ r: 6, strokeWidth: 2 }}
+                      connectNulls={false}
                     />
-                  </Line>
-                ))}
+                  );
+                })}
               </LineChart>
             </ResponsiveContainer>
           </div>
