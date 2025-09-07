@@ -442,6 +442,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const gwParam = (req.query?.gw as string) || '';
+    const testParam = req.query?.test;
     const gw = Number.isFinite(Number(gwParam)) && Number(gwParam) > 0
       ? Number(gwParam)
       : await resolveTargetGw();
@@ -454,6 +455,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const snapshot = await composeSnapshot(leagueId, gw);
     
     console.log(`[generate-now] Generated snapshot with ${snapshot.top3.length} top teams, ${snapshot.highlights.length} highlights, bench winner: ${snapshot.weekly.benchWarmer.manager} (${snapshot.weekly.benchWarmer.benchPoints}p)`);
+
+    // If test mode, return snapshot directly
+    if (testParam) {
+      return res.status(200).json({ 
+        ok: true, 
+        gameweek: gw, 
+        snapshot,
+        preview: {
+          butler: snapshot.butler.summary.substring(0, 100) + '...',
+          winner: `${snapshot.weekly.winner.manager} (${snapshot.weekly.winner.points}p)`,
+          benchWarmer: `${snapshot.weekly.benchWarmer.manager} (${snapshot.weekly.benchWarmer.benchPoints}p)`,
+          highlights: snapshot.highlights.length,
+          transferROI: `${snapshot.transferRoi.genius.manager} (+${snapshot.transferRoi.genius.roi})`
+        }
+      });
+    }
 
     // Send snapshot to ai-summary API for persistence
     const baseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://fpl-butler.vercel.app';
