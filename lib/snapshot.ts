@@ -289,23 +289,27 @@ export async function composeSnapshot(leagueId: string, gameweek: number): Promi
     }
   });
   
-  // 7. Transfer ROI for current GW
-  const roiRows = standings.map((row) => {
+  // 7. Transfer ROI for current GW - find best/worst individual transfers
+  const allTransfers: Array<{ manager: string; team: string; playerName: string; points: number }> = [];
+  standings.forEach((row) => {
     const entryId = row.entry;
     const transfers = (transfersByEntry[entryId] || []).filter((t: any) => t.event === gameweek);
-    const transfersInPoints = transfers.map((t: any) => {
+    transfers.forEach((t: any) => {
       const pts = pointsByElement[t.element_in] || 0;
       const name = elementIdToName[t.element_in] || `#${t.element_in}`;
-      return { name, points: pts };
+      allTransfers.push({
+        manager: row.player_name,
+        team: row.entry_name,
+        playerName: name,
+        points: pts
+      });
     });
-    const totalROI = transfersInPoints.reduce((s, x) => s + x.points, 0);
-    return {
-      manager: row.player_name,
-      team: row.entry_name,
-      transfersIn: transfersInPoints,
-      totalROI,
-    };
-  }).sort((a, b) => b.totalROI - a.totalROI);
+  });
+  
+  // Sort all individual transfers by points (highest first)
+  const sortedTransfers = allTransfers.sort((a, b) => b.points - a.points);
+  const bestTransfer = sortedTransfers[0] || { manager: '-', team: '-', playerName: 'Ingen bytter', points: 0 };
+  const worstTransfer = sortedTransfers[sortedTransfers.length - 1] || { manager: '-', team: '-', playerName: 'Ingen bytter', points: 0 };
   
   // 8. Differential hero (fewest owners, highest points)
   const ownershipCount: Record<number, number> = {};
@@ -465,16 +469,16 @@ export async function composeSnapshot(leagueId: string, gameweek: number): Promi
     },
     transferRoi: {
       genius: {
-        manager: roiRows[0]?.manager || '-',
-        team: roiRows[0]?.team || '-',
-        player: roiRows[0]?.transfersIn[0]?.name,
-        roi: roiRows[0]?.totalROI || 0
+        manager: bestTransfer.manager,
+        team: bestTransfer.team,
+        player: bestTransfer.playerName,
+        roi: bestTransfer.points
       },
       bomb: {
-        manager: roiRows[roiRows.length - 1]?.manager || '-',
-        team: roiRows[roiRows.length - 1]?.team || '-',
-        player: roiRows[roiRows.length - 1]?.transfersIn[0]?.name,
-        roi: roiRows[roiRows.length - 1]?.totalROI || 0
+        manager: worstTransfer.manager,
+        team: worstTransfer.team,
+        player: worstTransfer.playerName,
+        roi: worstTransfer.points
       }
     },
     highlights: [
