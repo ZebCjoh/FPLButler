@@ -48,7 +48,18 @@ const WeeklyStatsSection: React.FC<WeeklyStatsSectionProps> = ({
   const safeNextDeadline = ws.nextDeadline || { date: '-', time: '-', gameweek: currentGameweek || 0 };
   const safeFormTable = ws.formTable || { hotStreak: [], coldStreak: [] };
   const safeFormWindow = (ws.formData && ws.formData.window) || 3;
-  const safeTransferROI = ws.transferROI || { genius: { manager: '-', transfersIn: [{ name: 'Ingen bytter', points: 0 }] }, flop: { manager: '-', transfersIn: [{ name: 'Ingen bytter', points: 0 }] } };
+  const safeTransferROI = ws.transferROI || { genius: { manager: '-', transfersIn: [{ name: 'Ingen bytter', points: 0 }] }, flop: { manager: '-', transfersIn: [{ name: 'Ingen bytter', points: 0 }] } } as any;
+  // Compute total ROI (sum of all transfers' points) with fallback to totalROI if provided
+  const geniusTransfers = (safeTransferROI.genius?.transfersIn || []) as Array<{ name: string; points: number }>;
+  const flopTransfers = (safeTransferROI.flop?.transfersIn || []) as Array<{ name: string; points: number }>;
+  const geniusTotal: number = typeof safeTransferROI.genius?.totalROI === 'number'
+    ? safeTransferROI.genius.totalROI
+    : geniusTransfers.reduce((sum, t) => sum + (t?.points || 0), 0);
+  const flopTotal: number = typeof safeTransferROI.flop?.totalROI === 'number'
+    ? safeTransferROI.flop.totalROI
+    : flopTransfers.reduce((sum, t) => sum + (t?.points || 0), 0);
+  const geniusTopName = geniusTransfers?.[0]?.name || 'Ingen bytter';
+  const flopTopName = flopTransfers?.[0]?.name || 'Ingen bytter';
   const safeDifferential = ws.differential || { player: '-', points: 0, ownership: 0, managers: [] };
   if (isLoading) {
     return (
@@ -260,8 +271,8 @@ const WeeklyStatsSection: React.FC<WeeklyStatsSectionProps> = ({
               </div>
               <p className="text-white font-medium text-xs mb-1 truncate">{safeTransferROI.genius.manager}</p>
               <div className="flex justify-between items-center">
-                <span className="text-white/80 text-xs truncate">{safeTransferROI.genius.transfersIn?.[0]?.name || 'Ingen bytter'}</span>
-                <span className="text-green-300 font-bold text-xs">{safeTransferROI.genius.transfersIn?.[0]?.points || 0}p</span>
+                <span className="text-white/80 text-xs truncate">{geniusTopName}</span>
+                <span className="text-green-300 font-bold text-xs">{geniusTotal}p</span>
               </div>
             </div>
             <div className="bg-red-900/30 border border-red-600/50 rounded-lg p-2">
@@ -271,8 +282,8 @@ const WeeklyStatsSection: React.FC<WeeklyStatsSectionProps> = ({
               </div>
               <p className="text-white font-medium text-xs mb-1 truncate">{safeTransferROI.flop.manager}</p>
               <div className="flex justify-between items-center">
-                <span className="text-white/80 text-xs truncate">{safeTransferROI.flop.transfersIn?.[0]?.name || 'Ingen bytter'}</span>
-                <span className="text-red-300 font-bold text-xs">{safeTransferROI.flop.transfersIn?.[0]?.points || 0}p</span>
+                <span className="text-white/80 text-xs truncate">{flopTopName}</span>
+                <span className="text-red-300 font-bold text-xs">{flopTotal}p</span>
               </div>
             </div>
           </div>
