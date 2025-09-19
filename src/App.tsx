@@ -274,24 +274,27 @@ export const App = () => {
           }
         });
 
-        // 4c) Transfer ROI for current GW
-        const roiRows: Array<{ teamName: string; manager: string; transfersIn: Array<{ name: string; points: number }>; totalROI: number }>
-          = leagueEntriesWithLeague.map((row: any) => {
-            const entryId = row.entry;
-            const transfers = (transfersByEntry[entryId] || []).filter((t: any) => t.event === currentGW);
-            const transfersInPoints = transfers.map((t: any) => {
-              const pts = pointsByElement[t.element_in] || 0;
-              const name = elementIdToName[t.element_in] || `#${t.element_in}`;
-              return { name, points: pts };
-            });
-            const totalROI = transfersInPoints.reduce((s, x) => s + x.points, 0);
-            return {
-              teamName: row.entry_name,
+        // 4c) Transfer ROI for current GW - find best/worst individual transfers (matches snapshot logic)
+        const allTransfers: Array<{ manager: string; teamName: string; playerName: string; points: number }> = [];
+        leagueEntriesWithLeague.forEach((row: any) => {
+          const entryId = row.entry;
+          const transfers = (transfersByEntry[entryId] || []).filter((t: any) => t.event === currentGW);
+          transfers.forEach((t: any) => {
+            const pts = pointsByElement[t.element_in] || 0;
+            const name = elementIdToName[t.element_in] || `#${t.element_in}`;
+            allTransfers.push({
               manager: row.player_name,
-              transfersIn: transfersInPoints,
-              totalROI,
-            };
-          }).sort((a, b) => b.totalROI - a.totalROI);
+              teamName: row.entry_name,
+              playerName: name,
+              points: pts
+            });
+          });
+        });
+        
+        // Sort all individual transfers by points (highest first)
+        const sortedTransfers = allTransfers.sort((a, b) => b.points - a.points);
+        const bestTransfer = sortedTransfers[0] || { manager: '-', teamName: '-', playerName: 'Ingen bytter', points: 0 };
+        const worstTransfer = sortedTransfers[sortedTransfers.length - 1] || { manager: '-', teamName: '-', playerName: 'Ingen bytter', points: 0 };
 
         // 4d) Differential hero within league (deterministic calculation)
         const ownershipCount: Record<number, number> = {};
@@ -397,8 +400,14 @@ export const App = () => {
           },
           formData,
           transferROI: {
-            genius: roiRows[0],
-            flop: roiRows[roiRows.length - 1],
+            genius: { 
+              manager: bestTransfer.manager, 
+              transfersIn: [{ name: bestTransfer.playerName, points: bestTransfer.points }] 
+            },
+            flop: { 
+              manager: worstTransfer.manager, 
+              transfersIn: [{ name: worstTransfer.playerName, points: worstTransfer.points }] 
+            },
           },
           differential: {
             player: differential.player,
