@@ -26,27 +26,81 @@ interface LeagueEntry {
   event_total?: number;
 }
 
+// Resolve our public base URL for internal API calls (proxy to avoid FPL 403)
+function getBaseUrl(): string {
+  return process.env.PUBLIC_BASE_URL
+    || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://www.fplbutler.app');
+}
+
+// Simple retry helper for transient errors
+async function fetchWithRetry(url: string, options: RequestInit, retries = 2): Promise<Response> {
+  try {
+    const res = await fetch(url, options);
+    if (!res.ok && (res.status >= 500 || res.status === 429) && retries > 0) {
+      await new Promise(r => setTimeout(r, 800));
+      return fetchWithRetry(url, options, retries - 1);
+    }
+    return res;
+  } catch (err) {
+    if (retries > 0) {
+      await new Promise(r => setTimeout(r, 800));
+      return fetchWithRetry(url, options, retries - 1);
+    }
+    throw err;
+  }
+}
+
 async function fetchFPL<T>(url: string): Promise<T> {
+  const fplPrefix = 'https://fantasy.premierleague.com/api/';
+
+  // 1) Try via our own proxy endpoints first (avoids FPL 403)
+  if (url.startsWith(fplPrefix)) {
+    const path = url.substring(fplPrefix.length); // e.g. 'bootstrap-static/'
+    const proxyUrl = `${getBaseUrl()}/api/${path}`;
+    const proxyResp = await fetchWithRetry(proxyUrl, {
+      headers: { 'Accept': 'application/json' }
+    });
+    if (proxyResp.ok) {
+      return proxyResp.json() as Promise<T>;
+    }
+    console.warn(`[snapshot] Proxy fetch failed ${proxyResp.status} for ${proxyUrl}, falling back to direct`);
+  }
+
+  // 2) Fallback to direct FPL request with robust headers
   const headers = {
-    'User-Agent': 'Mozilla/5.0 (compatible; FPL-Butler/1.0)',
-    'Accept': 'application/json',
-    'Referer': 'https://fantasy.premierleague.com/'
+    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+    'Accept': 'application/json, text/plain, */*',
+    'Referer': 'https://fantasy.premierleague.com/',
+    'Accept-Language': 'en-US,en;q=0.9'
   } as Record<string, string>;
-  const resp = await fetch(url, { headers });
+  const resp = await fetchWithRetry(url, { headers });
   if (!resp.ok) {
-    const txt = await resp.text();
-    console.error(`[snapshot] FPL ${resp.status} for ${url}:`, txt);
+    const txt = await resp.text().catch(() => '');
+    console.error(`[snapshot] FPL ${resp.status} for ${url}:`, txt?.slice(0, 200));
     throw new Error(`FPL request failed ${resp.status}`);
   }
   return resp.json() as Promise<T>;
 }
 
 async function safeJson(url: string): Promise<any> {
-  const r = await fetch(url, {
+  const fplPrefix = 'https://fantasy.premierleague.com/api/';
+  if (url.startsWith(fplPrefix)) {
+    const path = url.substring(fplPrefix.length);
+    const proxyUrl = `${getBaseUrl()}/api/${path}`;
+    const pr = await fetchWithRetry(proxyUrl, { headers: { 'Accept': 'application/json' } });
+    const pct = pr.headers.get('content-type') || '';
+    if (pr.ok && pct.includes('application/json')) {
+      return pr.json();
+    }
+    console.warn(`[snapshot] Proxy safeJson failed ${pr.status} for ${proxyUrl}, falling back to direct`);
+  }
+
+  const r = await fetchWithRetry(url, {
     headers: {
-      'User-Agent': 'Mozilla/5.0 (compatible; FPL-Butler/1.0)',
-      'Accept': 'application/json',
-      'Referer': 'https://fantasy.premierleague.com/'
+      'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+      'Accept': 'application/json, text/plain, */*',
+      'Referer': 'https://fantasy.premierleague.com/',
+      'Accept-Language': 'en-US,en;q=0.9'
     }
   });
   const ct = r.headers.get('content-type') || '';
