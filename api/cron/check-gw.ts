@@ -1,5 +1,4 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { composeSnapshot } from '../../lib/snapshot';
 
 interface FPLEvent {
   id: number;
@@ -16,13 +15,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     console.log('[check-gw] Checking if gameweek is finished...');
     
-    // Fetch current gameweek status
-    const resp = await fetch('https://fantasy.premierleague.com/api/bootstrap-static/', {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; FPL-Butler/1.0)',
-        'Accept': 'application/json',
-        'Referer': 'https://fantasy.premierleague.com/'
-      }
+    // Use our proxy endpoint to avoid FPL 403 issues
+    const baseUrl = process.env.PUBLIC_BASE_URL
+      || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://www.fplbutler.app');
+    const resp = await fetch(`${baseUrl}/api/bootstrap-static`, {
+      headers: { 'Accept': 'application/json' }
     });
     
     if (!resp.ok) {
@@ -52,34 +49,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
     
-    console.log(`[check-gw] Gameweek ${currentEvent.id} is finished! Generating snapshot...`);
-    
-    // Generate complete snapshot
-    const leagueId = '155099';
-    const snapshot = await composeSnapshot(leagueId, currentEvent.id);
-    
-    console.log(`[check-gw] Generated snapshot for GW ${currentEvent.id}`);
-    
-    // Send to ai-summary API for persistence
-    const baseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://fpl-butler.vercel.app';
-    const aiResponse = await fetch(`${baseUrl}/api/ai-summary`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ snapshot })
-    });
-    
-    if (aiResponse.ok) {
-      console.log(`[check-gw] Successfully saved snapshot for finished GW ${currentEvent.id}`);
+    console.log(`[check-gw] Gameweek ${currentEvent.id} is finished! Triggering generate-now...`);
+
+    // Trigger the main generator which saves snapshot + AI summary
+    const genResp = await fetch(`${baseUrl}/api/cron/generate-now?gw=${currentEvent.id}`);
+    if (genResp.ok) {
+      const body = await genResp.json().catch(() => ({}));
+      console.log(`[check-gw] generate-now completed for GW ${currentEvent.id}`);
       return res.status(200).json({ 
         message: `Gameweek ${currentEvent.id} finished and snapshot generated`,
         gameweek: currentEvent.id,
         action: 'generated',
-        snapshotSize: JSON.stringify(snapshot).length
+        details: body
       });
     } else {
-      throw new Error(`Failed to save snapshot: ${aiResponse.status}`);
+      const txt = await genResp.text().catch(() => '');
+      throw new Error(`generate-now failed: ${genResp.status} ${txt}`);
     }
     
   } catch (error: any) {
