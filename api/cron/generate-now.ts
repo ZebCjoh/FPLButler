@@ -681,41 +681,28 @@ async function composeSnapshot(leagueId: string, gameweek: number): Promise<Snap
       }
     };
     
-    // Fetch ALL past template IDs to ensure no repeats until exhaustion
+    // Fetch global used-templates list to ensure no repeats until exhaustion
     const usedTemplateHashes = new Set<string>();
     try {
       const token = process.env.BLOB_READ_WRITE_TOKEN;
       if (token) {
         const { list } = await import('@vercel/blob');
-        const { blobs } = await list({ token, prefix: 'gw-' as any });
-        
-        // Get ALL past GWs (excluding current one being generated)
-        const pastGWs = (blobs || [])
-          .filter((b: any) => b.pathname.match(/^gw-(\d+)\.json$/) && b.pathname !== `gw-${gameweek}.json`)
-          .sort((a: any, b: any) => {
-            const gwA = parseInt(a.pathname.match(/gw-(\d+)/)?.[1] || '0');
-            const gwB = parseInt(b.pathname.match(/gw-(\d+)/)?.[1] || '0');
-            return gwB - gwA;
-          });
-        
-        // Extract ALL template IDs from ALL past snapshots
-        for (const blob of pastGWs) {
+        const { blobs } = await list({ token, prefix: 'used-templates.json' as any });
+        const stateBlob = (blobs || []).find((b: any) => b.pathname === 'used-templates.json');
+        if (stateBlob) {
+          const text = await (await fetch(stateBlob.url, { cache: 'no-store' as RequestCache })).text();
           try {
-            const resp = await fetch(blob.url);
-            const pastSnapshot = await resp.json();
-            // Only track if templateId exists (new format: e.g. "0-2-1-0-2")
-            if (pastSnapshot.butler?.templateId) {
-              usedTemplateHashes.add(pastSnapshot.butler.templateId);
-            }
+            const data = JSON.parse(text || '{}');
+            (data.used || []).forEach((id: string) => usedTemplateHashes.add(id));
           } catch (e) {
-            console.warn(`[snapshot] Could not parse past GW from ${blob.pathname}`, e);
+            console.warn('[snapshot] Failed to parse used-templates.json, starting fresh');
           }
+        } else {
+          console.log('[snapshot] No used-templates.json found, starting fresh');
         }
-        
-        console.log(`[snapshot] Loaded ${usedTemplateHashes.size} used templates from ${pastGWs.length} past GWs`);
       }
     } catch (e) {
-      console.warn('[snapshot] Could not fetch history for template tracking:', e);
+      console.warn('[snapshot] Could not load used-templates.json:', e);
     }
     
     // Generate butler assessment with exhaustive template tracking
@@ -726,6 +713,24 @@ async function composeSnapshot(leagueId: string, gameweek: number): Promise<Snap
     console.log(`[snapshot] Successfully composed snapshot for GW ${gameweek} with ${standings.length} teams`);
     console.log(`[snapshot] Butler object after assignment:`, JSON.stringify(snapshot.butler));
     console.log(`[snapshot] Full snapshot keys:`, Object.keys(snapshot.butler));
+
+    // Persist updated used-templates list (best-effort)
+    try {
+      const token = process.env.BLOB_READ_WRITE_TOKEN;
+      if (token && snapshot.butler.templateId) {
+        usedTemplateHashes.add(snapshot.butler.templateId);
+        const { put } = await import('@vercel/blob');
+        await put('used-templates.json', JSON.stringify({ used: Array.from(usedTemplateHashes) }, null, 2), {
+          access: 'public',
+          contentType: 'application/json',
+          token,
+          addRandomSuffix: false
+        });
+        console.log(`[snapshot] Updated used-templates.json with ${usedTemplateHashes.size} entries`);
+      }
+    } catch (e) {
+      console.warn('[snapshot] Failed to persist used-templates.json:', e);
+    }
     return snapshot;
     
   } catch (error) {
