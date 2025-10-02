@@ -720,7 +720,8 @@ async function composeSnapshot(leagueId: string, gameweek: number): Promise<Snap
     snapshot.butler.templateId = butlerResult.templateId;
     
     console.log(`[snapshot] Successfully composed snapshot for GW ${gameweek} with ${standings.length} teams`);
-    console.log(`[snapshot] Butler templateId: ${snapshot.butler.templateId}`);
+    console.log(`[snapshot] Butler object after assignment:`, JSON.stringify(snapshot.butler));
+    console.log(`[snapshot] Full snapshot keys:`, Object.keys(snapshot.butler));
     return snapshot;
     
   } catch (error) {
