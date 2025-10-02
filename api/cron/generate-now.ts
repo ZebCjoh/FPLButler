@@ -127,7 +127,8 @@ async function generateButlerAssessment(snapshot: Snapshot, usedTemplateHashes: 
   const structures = [
     { name: 'classic', fn: generateClassicStructure, parts: [5, 3, 3, 2, 3] }, // 5×3×3×2×3 = 270
     { name: 'story', fn: generateStoryStructure, parts: [3, 2, 2] }, // 3×2×2 = 12
-    { name: 'list', fn: generateListStructure, parts: [2] }, // 2×1×1×1 = 2 (simplified to just intro selection)
+    // Temporarily disabled List structure until templateId tracking is fixed
+    // { name: 'list', fn: generateListStructure, parts: [2] }, // 2×1×1×1 = 2 (simplified to just intro selection)
     { name: 'comparison', fn: generateComparisonStructure, parts: [2, 2] }, // 2×2 = 4
     { name: 'thematic', fn: generateThematicStructure, parts: [4, 2, 3] } // 4 themes × 2 intros × 3 conclusions = 24
   ];
@@ -179,11 +180,9 @@ async function generateButlerAssessment(snapshot: Snapshot, usedTemplateHashes: 
     const randomIdx = Math.floor(Math.random() * allCombinations.length);
     selectedCombo = allCombinations[randomIdx];
   } else {
-    // Pick randomly from unused, but avoid List structure (structureIdx 2) if possible
-    const nonListCombos = unusedCombinations.filter(c => c.structureIdx !== 2);
-    const poolToUse = nonListCombos.length > 0 ? nonListCombos : unusedCombinations;
-    const randomIdx = Math.floor(Math.random() * poolToUse.length);
-    selectedCombo = poolToUse[randomIdx];
+    // Pick randomly from unused
+    const randomIdx = Math.floor(Math.random() * unusedCombinations.length);
+    selectedCombo = unusedCombinations[randomIdx];
   }
   
   // Store the exact combination used for future tracking
