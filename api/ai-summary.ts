@@ -12,6 +12,8 @@ interface HistoryEntry {
 async function saveGameweekSnapshot(snapshot: Snapshot, token: string) {
   const gameweek = snapshot.meta.gameweek;
   
+  console.log(`[saveGameweekSnapshot] Saving GW${gameweek} with templateId: ${snapshot.butler?.templateId}`);
+  
   // 1. Save complete snapshot to gw-[id].json
   await put(`gw-${gameweek}.json`, JSON.stringify(snapshot, null, 2), {
     access: 'public',
@@ -94,6 +96,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         // Accept pre-generated snapshot
         snapshot = req.body.snapshot as Snapshot;
         console.log(`[ai-summary] Received pre-generated snapshot for GW ${snapshot.meta.gameweek}`);
+        console.log(`[ai-summary] Snapshot butler.templateId: ${snapshot.butler?.templateId}`);
       } else {
         // Generate new snapshot
         const gameweek = req.body?.gameweek;
