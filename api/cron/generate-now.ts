@@ -715,6 +715,7 @@ async function composeSnapshot(leagueId: string, gameweek: number): Promise<Snap
     snapshot.butler.summary = await generateButlerAssessment(snapshot, usedTemplateHashes);
     
     console.log(`[snapshot] Successfully composed snapshot for GW ${gameweek} with ${standings.length} teams`);
+    console.log(`[snapshot] Butler templateId: ${snapshot.butler.templateId}`);
     return snapshot;
     
   } catch (error) {
