@@ -179,9 +179,11 @@ async function generateButlerAssessment(snapshot: Snapshot, usedTemplateHashes: 
     const randomIdx = Math.floor(Math.random() * allCombinations.length);
     selectedCombo = allCombinations[randomIdx];
   } else {
-    // Pick randomly from unused
-    const randomIdx = Math.floor(Math.random() * unusedCombinations.length);
-    selectedCombo = unusedCombinations[randomIdx];
+    // Pick randomly from unused, but avoid List structure (structureIdx 2) if possible
+    const nonListCombos = unusedCombinations.filter(c => c.structureIdx !== 2);
+    const poolToUse = nonListCombos.length > 0 ? nonListCombos : unusedCombinations;
+    const randomIdx = Math.floor(Math.random() * poolToUse.length);
+    selectedCombo = poolToUse[randomIdx];
   }
   
   // Store the exact combination used for future tracking
