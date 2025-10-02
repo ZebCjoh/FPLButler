@@ -7,7 +7,7 @@ export interface Snapshot {
   };
   butler: {
     summary: string;
-    templateId?: string;
+    templateId: string;
   };
   top3: Array<{ rank: 1|2|3; team: string; manager: string; points: number }>;
   bottom3: Array<{ rank: number; team: string; manager: string; points: number }>;
