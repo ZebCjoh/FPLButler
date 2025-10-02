@@ -797,6 +797,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://www.fplbutler.app');
     const requestBody = { snapshot };
     console.log(`[generate-now] Sending snapshot to ai-summary, size: ${JSON.stringify(requestBody).length} bytes`);
+    console.log(`[generate-now] snapshot.butler before send:`, JSON.stringify(snapshot.butler));
     
     try {
       const aiResponse = await fetch(`${baseUrl}/api/ai-summary`, {
