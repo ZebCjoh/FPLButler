@@ -109,7 +109,7 @@ async function safeJson(url: string): Promise<any> {
   return r.json();
 }
 
-function generateButlerAssessment(snapshot: Snapshot): string {
+async function generateButlerAssessment(snapshot: Snapshot, usedStructures: number[]): Promise<string> {
   const { weekly } = snapshot;
   
   const hash = (s: string) => {
@@ -122,10 +122,16 @@ function generateButlerAssessment(snapshot: Snapshot): string {
   };
   
   const pick = <T,>(arr: T[], seed: string) => arr[Math.abs(hash(seed)) % arr.length];
+  
+  // Enhanced seed that includes past GWs to ensure variation
   const seed = JSON.stringify({
     gw: snapshot.meta.gameweek,
     w: weekly.winner.manager,
-    l: weekly.loser.manager
+    l: weekly.loser.manager,
+    // Add timestamp component to ensure different seeds even with identical data
+    ts: Math.floor(Date.now() / 1000000), // Changes every ~11.5 days
+    // Include history of used structures to influence selection
+    hist: usedStructures.slice(-3).join(',')
   });
   
   const structures = [
@@ -136,7 +142,25 @@ function generateButlerAssessment(snapshot: Snapshot): string {
     () => generateThematicStructure(snapshot, pick, seed)
   ];
   
-  return pick(structures, seed + '|structure')();
+  // Pick structure index, avoiding recently used ones if possible
+  let selectedIndex = Math.abs(hash(seed + '|structure')) % structures.length;
+  
+  // If this structure was used in the last 2 GWs, try to find an alternative
+  if (usedStructures.slice(-2).includes(selectedIndex) && structures.length > 1) {
+    // Try up to 5 alternative seeds to find a different structure
+    for (let attempt = 1; attempt <= 5; attempt++) {
+      const altIndex = Math.abs(hash(seed + '|structure|alt' + attempt)) % structures.length;
+      if (!usedStructures.slice(-2).includes(altIndex)) {
+        selectedIndex = altIndex;
+        break;
+      }
+    }
+  }
+  
+  // Store selected structure in snapshot for future tracking
+  snapshot.butler.templateId = `structure-${selectedIndex}`;
+  
+  return structures[selectedIndex]();
 }
 
 function generateClassicStructure(snapshot: Snapshot, pick: any, seed: string): string {
@@ -579,10 +603,53 @@ async function composeSnapshot(leagueId: string, gameweek: number): Promise<Snap
       }
     };
     
-    // Generate butler assessment
-    snapshot.butler.summary = generateButlerAssessment(snapshot);
+    // Fetch history to track previously used structures
+    const usedStructures: number[] = [];
+    try {
+      const token = process.env.BLOB_READ_WRITE_TOKEN;
+      if (token) {
+        const { list } = await import('@vercel/blob');
+        const { blobs } = await list({ token, prefix: 'gw-' as any });
+        
+        // Get last 4 GWs (excluding current one being generated)
+        const pastGWs = (blobs || [])
+          .filter((b: any) => b.pathname.match(/^gw-(\d+)\.json$/) && b.pathname !== `gw-${gameweek}.json`)
+          .sort((a: any, b: any) => {
+            const gwA = parseInt(a.pathname.match(/gw-(\d+)/)?.[1] || '0');
+            const gwB = parseInt(b.pathname.match(/gw-(\d+)/)?.[1] || '0');
+            return gwB - gwA;
+          })
+          .slice(0, 4);
+        
+        // Extract structure index from each past snapshot
+        for (const blob of pastGWs) {
+          try {
+            const resp = await fetch(blob.url);
+            const pastSnapshot = await resp.json();
+            // Extract structure ID if available, otherwise use a fallback hash
+            if (pastSnapshot.butler?.templateId) {
+              const match = pastSnapshot.butler.templateId.match(/structure-(\d+)/);
+              if (match) {
+                usedStructures.push(parseInt(match[1]));
+              }
+            } else {
+              // Fallback: hash the summary structure
+              const summaryHash = Math.abs(pastSnapshot.butler?.summary?.split('.')[0]?.length || 0) % 5;
+              usedStructures.push(summaryHash);
+            }
+          } catch (e) {
+            console.warn(`[snapshot] Could not parse past GW from ${blob.pathname}`, e);
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[snapshot] Could not fetch history for structure tracking:', e);
+    }
     
-    console.log(`[snapshot] Successfully composed snapshot for GW ${gameweek} with ${standings.length} teams`);
+    // Generate butler assessment with history awareness
+    snapshot.butler.summary = await generateButlerAssessment(snapshot, usedStructures);
+    
+    console.log(`[snapshot] Successfully composed snapshot for GW ${gameweek} with ${standings.length} teams (used structures: ${usedStructures.join(',')})`);
     return snapshot;
     
   } catch (error) {
