@@ -125,11 +125,11 @@ async function generateButlerAssessment(snapshot: Snapshot, usedTemplateHashes: 
   const allCombinations: Array<{ structureIdx: number; indices: number[]; generator: () => string }> = [];
   
   const structures = [
-    { name: 'classic', fn: generateClassicStructure, parts: [5, 3, 3, 2, 3] }, // openings, top, weak, special, punch
-    { name: 'story', fn: generateStoryStructure, parts: [3, 2, 2] }, // themes, stories, conclusions
-    { name: 'list', fn: generateListStructure, parts: [2, 1, 1, 1] }, // intros, p1, p2, p3
-    { name: 'comparison', fn: generateComparisonStructure, parts: [2, 2] }, // comparisons, morale
-    { name: 'thematic', fn: generateThematicStructure, parts: [4, 2, 3] } // themes, analyses, conclusions (simplified)
+    { name: 'classic', fn: generateClassicStructure, parts: [5, 3, 3, 2, 3] }, // 5×3×3×2×3 = 270
+    { name: 'story', fn: generateStoryStructure, parts: [3, 2, 2] }, // 3×2×2 = 12
+    { name: 'list', fn: generateListStructure, parts: [2] }, // 2×1×1×1 = 2 (simplified to just intro selection)
+    { name: 'comparison', fn: generateComparisonStructure, parts: [2, 2] }, // 2×2 = 4
+    { name: 'thematic', fn: generateThematicStructure, parts: [4, 2, 3] } // 4 themes × 2 intros × 3 conclusions = 24
   ];
   
   // Generate all combinations for each structure
@@ -257,15 +257,16 @@ function generateStoryStructure(snapshot: Snapshot, pick: any, seed: string, ind
 function generateListStructure(snapshot: Snapshot, pick: any, seed: string, indices?: number[]): string {
   const { weekly } = snapshot;
   const intros = ['Butlerens tre hovedobservasjoner fra denne uken:', 'Ukens viktigste lærdommer, ifølge butleren:'];
-  const point1 = [`Førstens: ${weekly.winner.manager} leverte ${weekly.winner.points} poeng og viste sporadisk kompetanse.`];
-  const point2 = [`For det andre: ${weekly.loser.manager} oppnådde ${weekly.loser.points} poeng gjennom kreativ underprestasjoner.`];
-  const point3 = [`Til slutt: ${weekly.benchWarmer.manager} hadde ${weekly.benchWarmer.benchPoints} poeng på benken – en metafor for manglende planlegging.`];
+  const point1 = `Førstens: ${weekly.winner.manager} leverte ${weekly.winner.points} poeng og viste sporadisk kompetanse.`;
+  const point2 = `For det andre: ${weekly.loser.manager} oppnådde ${weekly.loser.points} poeng gjennom kreativ underprestasjoner.`;
+  const point3 = `Til slutt: ${weekly.benchWarmer.manager} hadde ${weekly.benchWarmer.benchPoints} poeng på benken – en metafor for manglende planlegging.`;
   
-  if (indices && indices.length === 4) {
-    return `${intros[indices[0]]} ${point1[indices[1]]} ${point2[indices[2]]} ${point3[indices[3]]}`;
+  // Only intro varies (2 options), points are fixed
+  if (indices && indices.length === 1) {
+    return `${intros[indices[0]]} ${point1} ${point2} ${point3}`;
   }
   
-  return `${pick(intros, seed + '|intro')} ${pick(point1, seed + '|p1')} ${pick(point2, seed + '|p2')} ${pick(point3, seed + '|p3')}`;
+  return `${pick(intros, seed + '|intro')} ${point1} ${point2} ${point3}`;
 }
 
 function generateComparisonStructure(snapshot: Snapshot, pick: any, seed: string, indices?: number[]): string {
