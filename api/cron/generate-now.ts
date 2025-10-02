@@ -261,14 +261,17 @@ function generateListStructure(snapshot: Snapshot, pick: any, seed: string, indi
   const intros = ['Butlerens tre hovedobservasjoner fra denne uken:', 'Ukens viktigste lærdommer, ifølge butleren:'];
   const point1 = `Førstens: ${weekly.winner.manager} leverte ${weekly.winner.points} poeng og viste sporadisk kompetanse.`;
   const point2 = `For det andre: ${weekly.loser.manager} oppnådde ${weekly.loser.points} poeng gjennom kreativ underprestasjoner.`;
-  const point3 = `Til slutt: ${weekly.benchWarmer.manager} hadde ${weekly.benchWarmer.benchPoints} poeng på benken – en metafor for manglende planlegging.`;
+  const benchPoints = weekly.benchWarmer.benchPoints || 0;
+  const benchLine = benchPoints > 0
+    ? `Til slutt: ${weekly.benchWarmer.manager} hadde ${benchPoints} poeng på benken – ikke helt optimalt.`
+    : `Til slutt: ${weekly.benchWarmer.manager} hadde ${benchPoints} poeng på benken – effektiv utnyttelse av stallen.`;
   
   // Only intro varies (2 options), points are fixed
   if (indices && indices.length === 1) {
-    return `${intros[indices[0]]} ${point1} ${point2} ${point3}`;
+    return `${intros[indices[0]]} ${point1} ${point2} ${benchLine}`;
   }
   
-  return `${pick(intros, seed + '|intro')} ${point1} ${point2} ${point3}`;
+  return `${pick(intros, seed + '|intro')} ${point1} ${point2} ${benchLine}`;
 }
 
 function generateComparisonStructure(snapshot: Snapshot, pick: any, seed: string, indices?: number[]): string {
