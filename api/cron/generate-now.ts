@@ -109,7 +109,7 @@ async function safeJson(url: string): Promise<any> {
   return r.json();
 }
 
-async function generateButlerAssessment(snapshot: Snapshot, usedTemplateHashes: Set<string>): Promise<string> {
+async function generateButlerAssessment(snapshot: Snapshot, usedTemplateHashes: Set<string>): Promise<{ summary: string; templateId: string }> {
   const { weekly } = snapshot;
   
   const hash = (s: string) => {
@@ -186,11 +186,13 @@ async function generateButlerAssessment(snapshot: Snapshot, usedTemplateHashes: 
   
   // Store the exact combination used for future tracking
   const comboHash = `${selectedCombo.structureIdx}-${selectedCombo.indices.join('-')}`;
-  snapshot.butler.templateId = comboHash;
   
   console.log(`[butler] Selected template: ${comboHash}`);
   
-  return selectedCombo.generator();
+  return {
+    summary: selectedCombo.generator(),
+    templateId: comboHash
+  };
 }
 
 function generateClassicStructure(snapshot: Snapshot, pick: any, seed: string, indices?: number[]): string {
@@ -712,7 +714,9 @@ async function composeSnapshot(leagueId: string, gameweek: number): Promise<Snap
     }
     
     // Generate butler assessment with exhaustive template tracking
-    snapshot.butler.summary = await generateButlerAssessment(snapshot, usedTemplateHashes);
+    const butlerResult = await generateButlerAssessment(snapshot, usedTemplateHashes);
+    snapshot.butler.summary = butlerResult.summary;
+    snapshot.butler.templateId = butlerResult.templateId;
     
     console.log(`[snapshot] Successfully composed snapshot for GW ${gameweek} with ${standings.length} teams`);
     console.log(`[snapshot] Butler templateId: ${snapshot.butler.templateId}`);
