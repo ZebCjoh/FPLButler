@@ -109,7 +109,7 @@ async function safeJson(url: string): Promise<any> {
   return r.json();
 }
 
-async function generateButlerAssessment(snapshot: Snapshot, usedStructures: number[]): Promise<string> {
+async function generateButlerAssessment(snapshot: Snapshot, usedTemplateHashes: Set<string>): Promise<string> {
   const { weekly } = snapshot;
   
   const hash = (s: string) => {
@@ -121,49 +121,79 @@ async function generateButlerAssessment(snapshot: Snapshot, usedStructures: numb
     return h >>> 0;
   };
   
-  const pick = <T,>(arr: T[], seed: string) => arr[Math.abs(hash(seed)) % arr.length];
-  
-  // Enhanced seed that includes past GWs to ensure variation
-  const seed = JSON.stringify({
-    gw: snapshot.meta.gameweek,
-    w: weekly.winner.manager,
-    l: weekly.loser.manager,
-    // Add timestamp component to ensure different seeds even with identical data
-    ts: Math.floor(Date.now() / 1000000), // Changes every ~11.5 days
-    // Include history of used structures to influence selection
-    hist: usedStructures.slice(-3).join(',')
-  });
+  // Generate ALL possible template combinations
+  const allCombinations: Array<{ structureIdx: number; indices: number[]; generator: () => string }> = [];
   
   const structures = [
-    () => generateClassicStructure(snapshot, pick, seed),
-    () => generateStoryStructure(snapshot, pick, seed),
-    () => generateListStructure(snapshot, pick, seed),
-    () => generateComparisonStructure(snapshot, pick, seed),
-    () => generateThematicStructure(snapshot, pick, seed)
+    { name: 'classic', fn: generateClassicStructure, parts: [5, 3, 3, 2, 3] }, // openings, top, weak, special, punch
+    { name: 'story', fn: generateStoryStructure, parts: [3, 2, 2] }, // themes, stories, conclusions
+    { name: 'list', fn: generateListStructure, parts: [2, 1, 1, 1] }, // intros, p1, p2, p3
+    { name: 'comparison', fn: generateComparisonStructure, parts: [2, 2] }, // comparisons, morale
+    { name: 'thematic', fn: generateThematicStructure, parts: [4, 2, 3] } // themes, analyses, conclusions (simplified)
   ];
   
-  // Pick structure index, avoiding recently used ones if possible
-  let selectedIndex = Math.abs(hash(seed + '|structure')) % structures.length;
-  
-  // If this structure was used in the last 2 GWs, try to find an alternative
-  if (usedStructures.slice(-2).includes(selectedIndex) && structures.length > 1) {
-    // Try up to 5 alternative seeds to find a different structure
-    for (let attempt = 1; attempt <= 5; attempt++) {
-      const altIndex = Math.abs(hash(seed + '|structure|alt' + attempt)) % structures.length;
-      if (!usedStructures.slice(-2).includes(altIndex)) {
-        selectedIndex = altIndex;
-        break;
+  // Generate all combinations for each structure
+  structures.forEach((structure, structureIdx) => {
+    const generateIndices = (parts: number[], current: number[] = []): number[][] => {
+      if (current.length === parts.length) {
+        return [current];
       }
-    }
+      const results: number[][] = [];
+      for (let i = 0; i < parts[current.length]; i++) {
+        results.push(...generateIndices(parts, [...current, i]));
+      }
+      return results;
+    };
+    
+    const allIndices = generateIndices(structure.parts);
+    allIndices.forEach(indices => {
+      allCombinations.push({
+        structureIdx,
+        indices,
+        generator: () => {
+          // Create deterministic seed from indices
+          const deterministicSeed = `${structureIdx}-${indices.join('-')}`;
+          const pick = <T,>(arr: T[], idx: number) => arr[idx % arr.length];
+          return structure.fn(snapshot, pick, deterministicSeed, indices);
+        }
+      });
+    });
+  });
+  
+  console.log(`[butler] Total possible combinations: ${allCombinations.length}`);
+  console.log(`[butler] Already used: ${usedTemplateHashes.size}`);
+  
+  // Filter out already used combinations
+  const unusedCombinations = allCombinations.filter(combo => {
+    const comboHash = `${combo.structureIdx}-${combo.indices.join('-')}`;
+    return !usedTemplateHashes.has(comboHash);
+  });
+  
+  console.log(`[butler] Unused combinations available: ${unusedCombinations.length}`);
+  
+  // If all have been used, reset (clear the used set)
+  let selectedCombo;
+  if (unusedCombinations.length === 0) {
+    console.log('[butler] All combinations used! Resetting pool.');
+    // Pick from all combinations (fresh start)
+    const randomIdx = Math.floor(Math.random() * allCombinations.length);
+    selectedCombo = allCombinations[randomIdx];
+  } else {
+    // Pick randomly from unused
+    const randomIdx = Math.floor(Math.random() * unusedCombinations.length);
+    selectedCombo = unusedCombinations[randomIdx];
   }
   
-  // Store selected structure in snapshot for future tracking
-  snapshot.butler.templateId = `structure-${selectedIndex}`;
+  // Store the exact combination used for future tracking
+  const comboHash = `${selectedCombo.structureIdx}-${selectedCombo.indices.join('-')}`;
+  snapshot.butler.templateId = comboHash;
   
-  return structures[selectedIndex]();
+  console.log(`[butler] Selected template: ${comboHash}`);
+  
+  return selectedCombo.generator();
 }
 
-function generateClassicStructure(snapshot: Snapshot, pick: any, seed: string): string {
+function generateClassicStructure(snapshot: Snapshot, pick: any, seed: string, indices?: number[]): string {
   const { weekly } = snapshot;
   
   const openings = [
@@ -200,10 +230,15 @@ function generateClassicStructure(snapshot: Snapshot, pick: any, seed: string): 
     'Butleren konkluderer med at fotball tydeligvis er vanskeligere enn det ser ut på TV.'
   ];
   
+  // Use provided indices for deterministic selection, or fallback to pick function
+  if (indices && indices.length === 5) {
+    return `${openings[indices[0]]} ${top[indices[1]]} ${weak[indices[2]]} ${special[indices[3]]} ${punch[indices[4]]}`;
+  }
+  
   return `${pick(openings, seed + '|o')} ${pick(top, seed + '|t')} ${pick(weak, seed + '|w')} ${pick(special, seed + '|s')} ${pick(punch, seed + '|p')}`;
 }
 
-function generateStoryStructure(snapshot: Snapshot, pick: any, seed: string): string {
+function generateStoryStructure(snapshot: Snapshot, pick: any, seed: string, indices?: number[]): string {
   const { weekly } = snapshot;
   const themes = ['Ukens saga handler om triumf og nederlag', 'Historien som utspant seg denne uken', 'I denne episoden av managerial drama'];
   const stories = [
@@ -212,20 +247,28 @@ function generateStoryStructure(snapshot: Snapshot, pick: any, seed: string): st
   ];
   const conclusions = ['Butleren avventer neste kapittel med sedvanlig optimisme.', 'Historia fortsetter, butleren observerer.'];
   
+  if (indices && indices.length === 3) {
+    return `${themes[indices[0]]} ${stories[indices[1]]} ${conclusions[indices[2]]}`;
+  }
+  
   return `${pick(themes, seed + '|theme')} ${pick(stories, seed + '|story')} ${pick(conclusions, seed + '|conclusion')}`;
 }
 
-function generateListStructure(snapshot: Snapshot, pick: any, seed: string): string {
+function generateListStructure(snapshot: Snapshot, pick: any, seed: string, indices?: number[]): string {
   const { weekly } = snapshot;
   const intros = ['Butlerens tre hovedobservasjoner fra denne uken:', 'Ukens viktigste lærdommer, ifølge butleren:'];
   const point1 = [`Førstens: ${weekly.winner.manager} leverte ${weekly.winner.points} poeng og viste sporadisk kompetanse.`];
   const point2 = [`For det andre: ${weekly.loser.manager} oppnådde ${weekly.loser.points} poeng gjennom kreativ underprestasjoner.`];
   const point3 = [`Til slutt: ${weekly.benchWarmer.manager} hadde ${weekly.benchWarmer.benchPoints} poeng på benken – en metafor for manglende planlegging.`];
   
+  if (indices && indices.length === 4) {
+    return `${intros[indices[0]]} ${point1[indices[1]]} ${point2[indices[2]]} ${point3[indices[3]]}`;
+  }
+  
   return `${pick(intros, seed + '|intro')} ${pick(point1, seed + '|p1')} ${pick(point2, seed + '|p2')} ${pick(point3, seed + '|p3')}`;
 }
 
-function generateComparisonStructure(snapshot: Snapshot, pick: any, seed: string): string {
+function generateComparisonStructure(snapshot: Snapshot, pick: any, seed: string, indices?: number[]): string {
   const { weekly } = snapshot;
   const comparisons = [
     `Mens ${weekly.winner.manager} scoret ${weekly.winner.points} poeng med tilsynelatende letthet, klarte ${weekly.loser.manager} bare ${weekly.loser.points} – en kontrast som illustrerer forskjellen mellom planlegging og improvisasjon.`,
@@ -233,31 +276,58 @@ function generateComparisonStructure(snapshot: Snapshot, pick: any, seed: string
   ];
   const morale = ['Butleren observerer uten overraskelse.', 'Som forventet av butleren.'];
   
+  if (indices && indices.length === 2) {
+    return `${comparisons[indices[0]]} ${morale[indices[1]]}`;
+  }
+  
   return `${pick(comparisons, seed + '|comparison')} ${pick(morale, seed + '|morale')}`;
 }
 
-function generateThematicStructure(snapshot: Snapshot, pick: any, seed: string): string {
+function generateThematicStructure(snapshot: Snapshot, pick: any, seed: string, indices?: number[]): string {
   const { weekly } = snapshot;
   const themes = ['Kaos', 'Ironi', 'Ydmykhet', 'Realisme'];
-  const selectedTheme = pick(themes, seed + '|theme');
   
-  const themeIntros = {
-    'Kaos': ['I ukens kaotiske utveksling av poeng', 'Mens kaoset hersket på managerfronten'],
-    'Ironi': ['Med ironisk timing', 'I en ironisk vending'],
-    'Ydmykhet': ['Denne uken lærte managerne ydmykhet', 'Ydmykheten var ukens hovedtema'],
-    'Realisme': ['Realiteten slo inn denne uken', 'Som en kald dose realisme']
-  };
+  const themeIntros = [
+    ['I ukens kaotiske utveksling av poeng', 'Mens kaoset hersket på managerfronten'],
+    ['Med ironisk timing', 'I en ironisk vending'],
+    ['Denne uken lærte managerne ydmykhet', 'Ydmykheten var ukens hovedtema'],
+    ['Realiteten slo inn denne uken', 'Som en kald dose realisme']
+  ];
   
-  const analyses = {
-    'Kaos': [`presterte ${weekly.winner.manager} med ${weekly.winner.points} poeng mens ${weekly.loser.manager} endte på ${weekly.loser.points}. Kaoset var komplett.`],
-    'Ironi': [`scoret ${weekly.winner.manager} ${weekly.winner.points} poeng akkurat når ${weekly.loser.manager} leverte ${weekly.loser.points}. Ironien var ikke tapt på butleren.`],
-    'Ydmykhet': [`viste ${weekly.winner.manager} med ${weekly.winner.points} poeng at selv suksess er relativ, mens ${weekly.loser.manager}s ${weekly.loser.points} poeng demonstrerte lærdommen fullstendig.`],
-    'Realisme': [`leverte ${weekly.winner.manager} ${weekly.winner.points} poeng og ${weekly.loser.manager} ${weekly.loser.points} poeng. Realiteten var brutal og lærerik.`]
-  };
+  const analyses = [
+    [`presterte ${weekly.winner.manager} med ${weekly.winner.points} poeng mens ${weekly.loser.manager} endte på ${weekly.loser.points}. Kaoset var komplett.`],
+    [`scoret ${weekly.winner.manager} ${weekly.winner.points} poeng akkurat når ${weekly.loser.manager} leverte ${weekly.loser.points}. Ironien var ikke tapt på butleren.`],
+    [`viste ${weekly.winner.manager} med ${weekly.winner.points} poeng at selv suksess er relativ, mens ${weekly.loser.manager}s ${weekly.loser.points} poeng demonstrerte lærdommen fullstendig.`],
+    [`leverte ${weekly.winner.manager} ${weekly.winner.points} poeng og ${weekly.loser.manager} ${weekly.loser.points} poeng. Realiteten var brutal og lærerik.`]
+  ];
   
   const conclusions = ['Butleren noterer seg tendensen.', 'Som alltid observerer butleren med interesse.', 'Butleren forventer kontinuitet.'];
   
-  return `${pick(themeIntros[selectedTheme as keyof typeof themeIntros] || themeIntros['Kaos'], seed + '|intro')} ${pick(analyses[selectedTheme as keyof typeof analyses] || analyses['Kaos'], seed + '|analysis')} ${pick(conclusions, seed + '|conclusion')}`;
+  // indices[0] = theme (0-3), indices[1] = intro variant (0-1), indices[2] = conclusion (0-2)
+  // For simplicity: map first index to theme, second to intro, third to conclusion (analyses is always [0] per theme)
+  if (indices && indices.length === 3) {
+    const themeIdx = indices[0]; // 0-3 for theme
+    const introIdx = indices[1] % 2; // 0-1 for intro variant
+    const conclusionIdx = indices[2]; // 0-2 for conclusion
+    return `${themeIntros[themeIdx][introIdx]} ${analyses[themeIdx][0]} ${conclusions[conclusionIdx]}`;
+  }
+  
+  const selectedTheme = pick(themes, seed + '|theme');
+  const themeIdx = themes.indexOf(selectedTheme);
+  const themeIntrosLegacy = {
+    'Kaos': themeIntros[0],
+    'Ironi': themeIntros[1],
+    'Ydmykhet': themeIntros[2],
+    'Realisme': themeIntros[3]
+  };
+  const analysesLegacy = {
+    'Kaos': analyses[0],
+    'Ironi': analyses[1],
+    'Ydmykhet': analyses[2],
+    'Realisme': analyses[3]
+  };
+  
+  return `${pick(themeIntrosLegacy[selectedTheme as keyof typeof themeIntrosLegacy] || themeIntros[0], seed + '|intro')} ${pick(analysesLegacy[selectedTheme as keyof typeof analysesLegacy] || analyses[0], seed + '|analysis')} ${pick(conclusions, seed + '|conclusion')}`;
 }
 
 async function composeSnapshot(leagueId: string, gameweek: number): Promise<Snapshot> {
@@ -603,53 +673,47 @@ async function composeSnapshot(leagueId: string, gameweek: number): Promise<Snap
       }
     };
     
-    // Fetch history to track previously used structures
-    const usedStructures: number[] = [];
+    // Fetch ALL past template IDs to ensure no repeats until exhaustion
+    const usedTemplateHashes = new Set<string>();
     try {
       const token = process.env.BLOB_READ_WRITE_TOKEN;
       if (token) {
         const { list } = await import('@vercel/blob');
         const { blobs } = await list({ token, prefix: 'gw-' as any });
         
-        // Get last 4 GWs (excluding current one being generated)
+        // Get ALL past GWs (excluding current one being generated)
         const pastGWs = (blobs || [])
           .filter((b: any) => b.pathname.match(/^gw-(\d+)\.json$/) && b.pathname !== `gw-${gameweek}.json`)
           .sort((a: any, b: any) => {
             const gwA = parseInt(a.pathname.match(/gw-(\d+)/)?.[1] || '0');
             const gwB = parseInt(b.pathname.match(/gw-(\d+)/)?.[1] || '0');
             return gwB - gwA;
-          })
-          .slice(0, 4);
+          });
         
-        // Extract structure index from each past snapshot
+        // Extract ALL template IDs from ALL past snapshots
         for (const blob of pastGWs) {
           try {
             const resp = await fetch(blob.url);
             const pastSnapshot = await resp.json();
-            // Extract structure ID if available, otherwise use a fallback hash
+            // Only track if templateId exists (new format: e.g. "0-2-1-0-2")
             if (pastSnapshot.butler?.templateId) {
-              const match = pastSnapshot.butler.templateId.match(/structure-(\d+)/);
-              if (match) {
-                usedStructures.push(parseInt(match[1]));
-              }
-            } else {
-              // Fallback: hash the summary structure
-              const summaryHash = Math.abs(pastSnapshot.butler?.summary?.split('.')[0]?.length || 0) % 5;
-              usedStructures.push(summaryHash);
+              usedTemplateHashes.add(pastSnapshot.butler.templateId);
             }
           } catch (e) {
             console.warn(`[snapshot] Could not parse past GW from ${blob.pathname}`, e);
           }
         }
+        
+        console.log(`[snapshot] Loaded ${usedTemplateHashes.size} used templates from ${pastGWs.length} past GWs`);
       }
     } catch (e) {
-      console.warn('[snapshot] Could not fetch history for structure tracking:', e);
+      console.warn('[snapshot] Could not fetch history for template tracking:', e);
     }
     
-    // Generate butler assessment with history awareness
-    snapshot.butler.summary = await generateButlerAssessment(snapshot, usedStructures);
+    // Generate butler assessment with exhaustive template tracking
+    snapshot.butler.summary = await generateButlerAssessment(snapshot, usedTemplateHashes);
     
-    console.log(`[snapshot] Successfully composed snapshot for GW ${gameweek} with ${standings.length} teams (used structures: ${usedStructures.join(',')})`);
+    console.log(`[snapshot] Successfully composed snapshot for GW ${gameweek} with ${standings.length} teams`);
     return snapshot;
     
   } catch (error) {
