@@ -555,7 +555,8 @@ async function composeSnapshot(leagueId: string, gameweek: number): Promise<Snap
         createdAt: new Date().toISOString()
       },
       butler: {
-        summary: '' // Will be generated below
+        summary: '', // Will be generated below
+        templateId: undefined // Will be set by generateButlerAssessment
       },
       top3,
       bottom3,
