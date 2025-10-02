@@ -180,9 +180,22 @@ async function generateButlerAssessment(snapshot: Snapshot, usedTemplateHashes: 
     const randomIdx = Math.floor(Math.random() * allCombinations.length);
     selectedCombo = allCombinations[randomIdx];
   } else {
-    // Pick randomly from unused
-    const randomIdx = Math.floor(Math.random() * unusedCombinations.length);
-    selectedCombo = unusedCombinations[randomIdx];
+    // Prefer a deterministic non-list structure for specific cases (e.g., GW6 hotfix)
+    const forceClassicForGw = snapshot.meta?.gameweek === 6;
+    if (forceClassicForGw) {
+      const classicCombos = unusedCombinations.filter(c => c.structureIdx === 0);
+      if (classicCombos.length > 0) {
+        const randomIdx = Math.floor(Math.random() * classicCombos.length);
+        selectedCombo = classicCombos[randomIdx];
+      } else {
+        const randomIdx = Math.floor(Math.random() * unusedCombinations.length);
+        selectedCombo = unusedCombinations[randomIdx];
+      }
+    } else {
+      // Pick randomly from unused
+      const randomIdx = Math.floor(Math.random() * unusedCombinations.length);
+      selectedCombo = unusedCombinations[randomIdx];
+    }
   }
   
   // Store the exact combination used for future tracking
