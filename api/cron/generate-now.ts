@@ -114,7 +114,8 @@ type StructureName = 'classic' | 'story' | 'list' | 'comparison' | 'thematic';
 async function generateButlerAssessment(
   snapshot: Snapshot,
   usedTemplateHashes: Set<string>,
-  forcedStructure?: StructureName
+  forcedStructure?: StructureName,
+  deterministicIndex?: number
 ): Promise<{ summary: string; templateId: string }> {
   const { weekly } = snapshot;
   
@@ -187,9 +188,15 @@ async function generateButlerAssessment(
     const randomIdx = Math.floor(Math.random() * allCombinations.length);
     selectedCombo = allCombinations[randomIdx];
   } else {
-    // Pick randomly from unused
-    const randomIdx = Math.floor(Math.random() * unusedCombinations.length);
-    selectedCombo = unusedCombinations[randomIdx];
+    // Deterministic selection based on GW to prevent repeats without storage
+    if (typeof deterministicIndex === 'number') {
+      const idx = ((deterministicIndex % unusedCombinations.length) + unusedCombinations.length) % unusedCombinations.length;
+      selectedCombo = unusedCombinations[idx];
+    } else {
+      // Pick randomly from unused
+      const randomIdx = Math.floor(Math.random() * unusedCombinations.length);
+      selectedCombo = unusedCombinations[randomIdx];
+    }
   }
   
   // Store the exact combination used for future tracking
@@ -713,9 +720,10 @@ async function composeSnapshot(leagueId: string, gameweek: number): Promise<Snap
     }
     
     // Generate butler assessment with exhaustive template tracking
-    // Force Classic for GW6 to break repetition deterministically
-    const forced: StructureName | undefined = gameweek === 6 ? 'classic' : undefined;
-    const butlerResult = await generateButlerAssessment(snapshot, usedTemplateHashes, forced);
+    // Deterministic selection index: rotate by GW number to ensure new template per GW
+    const deterministicIdx = (gameweek * 37) % 100000; // large stride to spread selection
+    const forced: StructureName | undefined = undefined; // no per-GW forcing
+    const butlerResult = await generateButlerAssessment(snapshot, usedTemplateHashes, forced, deterministicIdx);
     snapshot.butler.summary = butlerResult.summary;
     snapshot.butler.templateId = butlerResult.templateId;
     
