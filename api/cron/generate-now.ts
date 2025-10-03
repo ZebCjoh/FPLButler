@@ -790,6 +790,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Cache-Control', 'no-store, max-age=0');
   if (req.method === 'OPTIONS') return res.status(204).end();
 
   if (req.method !== 'GET' && req.method !== 'POST') {
@@ -811,8 +812,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Generate complete snapshot using full data aggregation
     // Bump a query nonce to force edge to run the latest build
     const rotate = typeof req.query?.rotate === 'string' ? Number(req.query?.rotate) : undefined;
+    const structureParam = String(req.query?.structure || '').toLowerCase();
+    const allowed: StructureName[] = ['classic','story','list','comparison','thematic'];
+    const forcedStructure = (allowed as string[]).includes(structureParam) ? (structureParam as StructureName) : undefined;
     const snapshot = await composeSnapshot(leagueId, gw, {
-      deterministicIndex: typeof rotate === 'number' && Number.isFinite(rotate) ? rotate : (gw * 37)
+      deterministicIndex: typeof rotate === 'number' && Number.isFinite(rotate) ? rotate : (gw * 37),
+      forcedStructure,
     });
     
     console.log(`[generate-now] Generated snapshot with ${snapshot.top3.length} top teams, ${snapshot.highlights.length} highlights, bench winner: ${snapshot.weekly.benchWarmer.manager} (${snapshot.weekly.benchWarmer.benchPoints}p)`);
