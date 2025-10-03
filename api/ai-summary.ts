@@ -9,13 +9,14 @@ interface HistoryEntry {
 }
 
 // Helper function to save complete gameweek snapshot
-async function saveGameweekSnapshot(snapshot: Snapshot, token: string) {
+async function saveGameweekSnapshot(snapshot: Snapshot, token: string, useV2 = false) {
   const gameweek = snapshot.meta.gameweek;
   
-  console.log(`[saveGameweekSnapshot] Saving GW${gameweek} with templateId: ${snapshot.butler?.templateId}`);
+  console.log(`[saveGameweekSnapshot] Saving GW${gameweek} with templateId: ${snapshot.butler?.templateId}, v2: ${useV2}`);
   
-  // 1. Save complete snapshot to gw-[id].json
-  await put(`gw-${gameweek}.json`, JSON.stringify(snapshot, null, 2), {
+  // 1. Save complete snapshot to gw-[id].json or gw-[id].v2.json
+  const filename = useV2 ? `gw-${gameweek}.v2.json` : `gw-${gameweek}.json`;
+  await put(filename, JSON.stringify(snapshot, null, 2), {
     access: 'public',
     contentType: 'application/json',
     token,
@@ -113,6 +114,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
       }
       
+      // Check if this is a v2 hotfix (indicated by manual-hotfix templateId)
+      const isV2Hotfix = snapshot.butler?.templateId?.includes('manual-hotfix');
+      
       // Save current AI summary (simple format for compatibility)
       const { url: summaryUrl } = await put('ai-summary.json', JSON.stringify({
         gameweek: snapshot.meta.gameweek,
@@ -125,15 +129,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         addRandomSuffix: false
       });
       
-      // Save complete snapshot to history
-      await saveGameweekSnapshot(snapshot, token);
+      // Save complete snapshot to history (use v2 if hotfix)
+      await saveGameweekSnapshot(snapshot, token, isV2Hotfix);
       
       return res.status(200).json({ 
         success: true, 
         url: summaryUrl, 
         gameweek: snapshot.meta.gameweek, 
         historySaved: true,
-        snapshotSize: JSON.stringify(snapshot).length
+        snapshotSize: JSON.stringify(snapshot).length,
+        isV2: isV2Hotfix
       });
     }
 
