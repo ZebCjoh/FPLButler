@@ -351,7 +351,12 @@ function generateThematicStructure(snapshot: Snapshot, pick: any, seed: string, 
   return `${pick(themeIntrosLegacy[selectedTheme as keyof typeof themeIntrosLegacy] || themeIntros[0], seed + '|intro')} ${pick(analysesLegacy[selectedTheme as keyof typeof analysesLegacy] || analyses[0], seed + '|analysis')} ${pick(conclusions, seed + '|conclusion')}`;
 }
 
-async function composeSnapshot(leagueId: string, gameweek: number): Promise<Snapshot> {
+interface ComposeOptions {
+  forcedStructure?: StructureName;
+  deterministicIndex?: number;
+}
+
+async function composeSnapshot(leagueId: string, gameweek: number, options?: ComposeOptions): Promise<Snapshot> {
   console.log(`[snapshot] Composing snapshot for league ${leagueId}, GW ${gameweek}`);
   
   try {
@@ -723,7 +728,12 @@ async function composeSnapshot(leagueId: string, gameweek: number): Promise<Snap
     // Deterministic selection index: rotate by GW number to ensure new template per GW
     const deterministicIdx = (gameweek * 37) % 100000; // large stride to spread selection
     const forced: StructureName | undefined = undefined; // no per-GW forcing
-    const butlerResult = await generateButlerAssessment(snapshot, usedTemplateHashes, forced, deterministicIdx);
+    const butlerResult = await generateButlerAssessment(
+      snapshot,
+      usedTemplateHashes,
+      options?.forcedStructure,
+      options?.deterministicIndex
+    );
     snapshot.butler.summary = butlerResult.summary;
     snapshot.butler.templateId = butlerResult.templateId;
     
@@ -799,7 +809,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.log(`[generate-now] Generating complete snapshot for league ${leagueId}, GW ${gw}`);
     
     // Generate complete snapshot using full data aggregation
-    const snapshot = await composeSnapshot(leagueId, gw);
+    // Bump a query nonce to force edge to run the latest build
+    const rotate = typeof req.query?.rotate === 'string' ? Number(req.query?.rotate) : undefined;
+    const snapshot = await composeSnapshot(leagueId, gw, {
+      deterministicIndex: typeof rotate === 'number' && Number.isFinite(rotate) ? rotate : (gw * 37)
+    });
     
     console.log(`[generate-now] Generated snapshot with ${snapshot.top3.length} top teams, ${snapshot.highlights.length} highlights, bench winner: ${snapshot.weekly.benchWarmer.manager} (${snapshot.weekly.benchWarmer.benchPoints}p)`);
 
