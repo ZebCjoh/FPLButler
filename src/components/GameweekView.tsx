@@ -24,7 +24,10 @@ const GameweekView: React.FC<GameweekViewProps> = ({ gameweekId, onBackToHome })
         setLoading(true);
         setError(null);
         
-        const response = await fetch(`/api/history/${gameweekId}`);
+        // Add cache-busting for fresh data (especially critical for GW6 hotfix)
+        const response = await fetch(`/api/history/${gameweekId}?v=${Date.now()}`, {
+          cache: 'no-store'
+        });
         if (!response.ok) {
           throw new Error(`Failed to fetch snapshot: ${response.status}`);
         }

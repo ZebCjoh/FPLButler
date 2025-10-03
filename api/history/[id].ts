@@ -21,10 +21,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     console.log(`[API] Fetching complete snapshot for gameweek ${id} from Vercel Blob...`);
     
-    // Get gw-[id].json from blob (robust listing)
-    const filename = `gw-${id}.json`;
+    // Check for v2 file first (hotfix), then fall back to regular
     const { blobs } = await list({ token, prefix: 'gw-' as any });
-    const gameweekBlob = (blobs || []).find((b: any) => b.pathname === filename);
+    const v2Filename = `gw-${id}.v2.json`;
+    const regularFilename = `gw-${id}.json`;
+    
+    let gameweekBlob = (blobs || []).find((b: any) => b.pathname === v2Filename);
+    const filename = gameweekBlob ? v2Filename : regularFilename;
+    
+    if (!gameweekBlob) {
+      gameweekBlob = (blobs || []).find((b: any) => b.pathname === regularFilename);
+    }
     
     if (!gameweekBlob) {
       console.log(`[API] No snapshot found for gameweek ${id}`);
@@ -143,8 +150,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     console.log(`[API] Returning complete snapshot for gameweek ${id}`);
     
-    // Cache for 10 minutes since historical snapshots don't change
-    res.setHeader('Cache-Control', 's-maxage=600, stale-while-revalidate=300');
+    // No-cache headers to prevent stale data
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
     return res.status(200).json(snapshot);
 
   } catch (error) {
