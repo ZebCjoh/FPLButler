@@ -109,7 +109,13 @@ async function safeJson(url: string): Promise<any> {
   return r.json();
 }
 
-async function generateButlerAssessment(snapshot: Snapshot, usedTemplateHashes: Set<string>): Promise<{ summary: string; templateId: string }> {
+type StructureName = 'classic' | 'story' | 'list' | 'comparison' | 'thematic';
+
+async function generateButlerAssessment(
+  snapshot: Snapshot,
+  usedTemplateHashes: Set<string>,
+  forcedStructure?: StructureName
+): Promise<{ summary: string; templateId: string }> {
   const { weekly } = snapshot;
   
   const hash = (s: string) => {
@@ -125,16 +131,17 @@ async function generateButlerAssessment(snapshot: Snapshot, usedTemplateHashes: 
   const allCombinations: Array<{ structureIdx: number; indices: number[]; generator: () => string }> = [];
   
   const structures = [
-    { name: 'classic', fn: generateClassicStructure, parts: [5, 3, 3, 2, 3] }, // 5×3×3×2×3 = 270
-    { name: 'story', fn: generateStoryStructure, parts: [3, 2, 2] }, // 3×2×2 = 12
-    // Temporarily disabled List structure until templateId tracking is fixed
-    // { name: 'list', fn: generateListStructure, parts: [2] }, // 2×1×1×1 = 2 (simplified to just intro selection)
-    { name: 'comparison', fn: generateComparisonStructure, parts: [2, 2] }, // 2×2 = 4
-    { name: 'thematic', fn: generateThematicStructure, parts: [4, 2, 3] } // 4 themes × 2 intros × 3 conclusions = 24
+    { key: 'classic' as StructureName, fn: generateClassicStructure, parts: [5, 3, 3, 2, 3] }, // 5×3×3×2×3 = 270
+    { key: 'story' as StructureName, fn: generateStoryStructure, parts: [3, 2, 2] }, // 3×2×2 = 12
+    { key: 'list' as StructureName, fn: generateListStructure, parts: [2] }, // 2×1×1×1 = 2 (intro only)
+    { key: 'comparison' as StructureName, fn: generateComparisonStructure, parts: [2, 2] }, // 2×2 = 4
+    { key: 'thematic' as StructureName, fn: generateThematicStructure, parts: [4, 2, 3] } // 4×2×3 = 24
   ];
   
   // Generate all combinations for each structure
-  structures.forEach((structure, structureIdx) => {
+  const structuresToUse = forcedStructure ? structures.filter(s => s.key === forcedStructure) : structures;
+
+  structuresToUse.forEach((structure, structureIdx) => {
     const generateIndices = (parts: number[], current: number[] = []): number[][] => {
       if (current.length === parts.length) {
         return [current];
@@ -180,22 +187,9 @@ async function generateButlerAssessment(snapshot: Snapshot, usedTemplateHashes: 
     const randomIdx = Math.floor(Math.random() * allCombinations.length);
     selectedCombo = allCombinations[randomIdx];
   } else {
-    // Prefer a deterministic non-list structure for specific cases (e.g., GW6 hotfix)
-    const forceClassicForGw = snapshot.meta?.gameweek === 6;
-    if (forceClassicForGw) {
-      const classicCombos = unusedCombinations.filter(c => c.structureIdx === 0);
-      if (classicCombos.length > 0) {
-        const randomIdx = Math.floor(Math.random() * classicCombos.length);
-        selectedCombo = classicCombos[randomIdx];
-      } else {
-        const randomIdx = Math.floor(Math.random() * unusedCombinations.length);
-        selectedCombo = unusedCombinations[randomIdx];
-      }
-    } else {
-      // Pick randomly from unused
-      const randomIdx = Math.floor(Math.random() * unusedCombinations.length);
-      selectedCombo = unusedCombinations[randomIdx];
-    }
+    // Pick randomly from unused
+    const randomIdx = Math.floor(Math.random() * unusedCombinations.length);
+    selectedCombo = unusedCombinations[randomIdx];
   }
   
   // Store the exact combination used for future tracking
@@ -719,7 +713,9 @@ async function composeSnapshot(leagueId: string, gameweek: number): Promise<Snap
     }
     
     // Generate butler assessment with exhaustive template tracking
-    const butlerResult = await generateButlerAssessment(snapshot, usedTemplateHashes);
+    // Force Classic for GW6 to break repetition deterministically
+    const forced: StructureName | undefined = gameweek === 6 ? 'classic' : undefined;
+    const butlerResult = await generateButlerAssessment(snapshot, usedTemplateHashes, forced);
     snapshot.butler.summary = butlerResult.summary;
     snapshot.butler.templateId = butlerResult.templateId;
     
