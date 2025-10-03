@@ -141,8 +141,11 @@ async function generateButlerAssessment(
   
   // Generate all combinations for each structure
   const structuresToUse = forcedStructure ? structures.filter(s => s.key === forcedStructure) : structures;
+  
+  console.log(`[butler] forcedStructure=${forcedStructure}, structuresToUse.length=${structuresToUse.length}`);
 
-  structuresToUse.forEach((structure, structureIdx) => {
+  structuresToUse.forEach((structure, originalStructureIdx) => {
+    const structureIdx = forcedStructure ? structures.findIndex(s => s.key === structure.key) : originalStructureIdx;
     const generateIndices = (parts: number[], current: number[] = []): number[][] => {
       if (current.length === parts.length) {
         return [current];
