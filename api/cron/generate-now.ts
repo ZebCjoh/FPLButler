@@ -728,14 +728,12 @@ async function composeSnapshot(leagueId: string, gameweek: number, options?: Com
     }
     
     // Generate butler assessment with exhaustive template tracking
-    // Deterministic selection index: rotate by GW number to ensure new template per GW
-    const deterministicIdx = (gameweek * 37) % 100000; // large stride to spread selection
-    const forced: StructureName | undefined = undefined; // no per-GW forcing
+    // Use random selection from unused pool (no deterministic index)
     const butlerResult = await generateButlerAssessment(
       snapshot,
       usedTemplateHashes,
       options?.forcedStructure,
-      options?.deterministicIndex
+      undefined // random from unused, not deterministic
     );
     snapshot.butler.summary = butlerResult.summary;
     snapshot.butler.templateId = butlerResult.templateId;
@@ -814,13 +812,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.log(`[generate-now] Generating complete snapshot for league ${leagueId}, GW ${gw}`);
     
     // Generate complete snapshot using full data aggregation
-    // Bump a query nonce to force edge to run the latest build
-    const rotate = typeof req.query?.rotate === 'string' ? Number(req.query?.rotate) : undefined;
     const structureParam = String(req.query?.structure || '').toLowerCase();
     const allowed: StructureName[] = ['classic','story','list','comparison','thematic'];
     const forcedStructure = (allowed as string[]).includes(structureParam) ? (structureParam as StructureName) : undefined;
     const snapshot = await composeSnapshot(leagueId, gw, {
-      deterministicIndex: typeof rotate === 'number' && Number.isFinite(rotate) ? rotate : (gw * 37),
       forcedStructure,
     });
     
