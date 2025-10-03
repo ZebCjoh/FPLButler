@@ -787,6 +787,7 @@ async function resolveTargetGw(): Promise<number> {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // Force fresh edge runtime - v2024-10-03-1
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
